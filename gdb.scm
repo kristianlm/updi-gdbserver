@@ -5,6 +5,49 @@
         chicken.bitwise
         chicken.file.posix)
 
+(include "pages.scm")
+
+;; gdb-addressing (flash starting at 0x00)
+(define cache (make-memory-cache #x1000)) ;; <-- TODO actual target size
+
+(define (bytes-for-each/i s proc)
+  (let loop ((n 0))
+    (when (< n (string-length s))
+      (proc (char->integer (string-ref s n)) n)
+      (loop (+ n 1)))))
+
+(unless (equal? (with-output-to-string (lambda () (bytes-for-each/i "ABC" print)))
+                "650\n661\n672\n")
+  (error "test fail bytes-for-each/i"))
+
+;; addr gdb memory space
+(define (memory-write addr bytes)
+  (if (< addr gdb-ram-start)
+      ;; flash writes go to cache
+      (bytes-for-each/i
+       bytes
+       (lambda (byte index)
+         (cache #:set (+ addr index) byte)))
+      ;; non-flash written directly
+      (memory-write* (gdb-adr->updi-adr addr) bytes)))
+
+(define (cache-flush!)
+  (let ((pages (memory-pages (cache #:memory) 64)))
+    (pages-write pages
+                 (lambda (addr len)
+                   (list->vector
+                    (map char->integer
+                         (string->list
+                          (memory-read* (gdb-adr->updi-adr addr) len)))))
+                 (lambda (addr vec)
+                   (print "WRITING " addr " " (vector-length vec))
+                   (let ((bytes
+                          (list->string (map integer->char (vector->list vec)))))
+                    (memory-write* (gdb-adr->updi-adr addr) bytes 1))
+                   ;;          ,-- erase and program
+                   (STS #x1000 3 1)))
+    (cache #:clear)))
+
 (define (read-char* ip)
   (parameterize ((tcp-read-timeout #f))
     (read-char ip)))
@@ -117,16 +160,20 @@
     (rsp-write "S00" op))
 
    ((equal? cmd "c")
+    (cache-flush!)
     ;; don't rsp-write here! reply at upcoming breakpoint or 'break
     (cont!))
    
    ((equal? cmd "qAttached") ;; attached to existing "process"?
+    (cache-flush!)
     (rsp-write "1" op))
 
    ((equal? cmd "?") ;; stop reason
+    (cache-flush!)
     (rsp-write "S00" op))
 
    ((equal? cmd "g") ;; send all registers
+    (cache-flush!)
     (rsp-write (string->hex
                 (->bytes
                  (regs) ;; r0 - r31
@@ -144,33 +191,35 @@
 
    ;; store register value
    ((and (string? cmd) (substring=? cmd "P"))
+    (cache-flush!)
     (apply
      (lambda (R value)
        (set! (r R) value)
        (rsp-write "OK" op))
      (cmd-args cmd "=")))
 
-   ((and (string? cmd) (substring=? cmd "m"))
-    (apply
-     (lambda (addr len)
-       (rsp-write (string->hex (memory-read* (gdb-adr->updi-adr addr) len)) op))
-     (cmd-args cmd ",")))
-
    ;; (gdb) monitor reset => "qRcmd,7265736574"
    ;; "OK" => OK, no output
    ;; "xxXXxxXX" hex string => normal output
    ;; "E xx" => error
    ((and (string? cmd) (substring=? cmd "qRcmd,"))    
+    (cache-flush!)
     (apply
      (lambda (_ #!optional (hex ""))
-       (cond ((equal? hex (string->hex "reset"))
-              (set! (resetting) #t)
-              (set! (resetting) #f)
-              (rsp-write "OK" op))
-             (else (rsp-write "E00" op))))
+       (rsp-write
+        (string->hex
+         (conc (wrt (eval (with-input-from-string (hex->string hex) read))) "\n"))
+        op))
      (irregex-split `(",") cmd)))
 
-   ;; TODO: support X for less hex parsing and stuff (must redo packet framing)
+   ((and (string? cmd) (substring=? cmd "m"))
+    (cache-flush!)
+    (apply
+     (lambda (addr len)
+       (rsp-write (string->hex (memory-read* (gdb-adr->updi-adr addr) len)) op))
+     (cmd-args cmd ",")))
+
+   ;; TODO: support X for less hex parsing and stuff maybe
    ;;((and (string? cmd) (substring=? cmd "X")))
    
    ;; store to memory (hex)
@@ -180,15 +229,7 @@
      (lambda (addr* len* hex)
        (let ((addr (string->number addr* 16))
              (len (string->number len* 16)))
-         ;;(print (wrt addr*) " µ " len " = " hex)
-         (memory-write* (gdb-adr->updi-adr addr) (hex->string hex) 1)
-
-         ;; TODO: make sure the addresses are aligned. writing a page
-         ;; erases it's previous page :-( this needs a lot of cleanup.
-         (when (< addr gdb-ram-start) ;; it's flash!
-           ;; data is in page buffer
-           (STS #x1000 3 1)) ;; issue NVM erase+prog
-         
+         (memory-write addr (hex->string hex))
          (rsp-write "OK" op)))
      (irregex-split `(or ":" ",") (substring cmd 1))))
    
