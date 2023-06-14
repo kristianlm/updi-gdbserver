@@ -63,7 +63,7 @@
               (error "reader returned bad memory segment length" (vector-length old) pagesize)))
          (vec (vector-merge old (page-vector page))))
     (if (equal? vec old)
-        (print "ignoring write page " vec)
+        (print "skipping identical page @ #x" (number->string (page-addr page) 16))
         (writer (page-addr page) vec))))
 
 (define (pages-write pages reader writer)
