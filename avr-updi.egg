@@ -1,0 +1,13 @@
+;; -*- scheme -*-
+((synopsis "AVR microcontroller UPDI library")
+ (author "Kristian Lein-Mathisen")
+ (category tools)
+ (license "GPL")
+ (dependencies srfi-18)
+ (foreign-dependencies)
+ (test-dependencies test)
+ (components
+  (extension avr.updi
+             (source "avr-updi-module.scm")
+             (source-dependencies
+              "avr-updi.scm" "bytes.scm" "tty.scm"))))
