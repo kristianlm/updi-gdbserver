@@ -279,6 +279,11 @@
   (when (halted?) ;; extra safety check
     (error "OBS: could not resume target")))
 
+(define (reset!)
+  (set! (resetting) #t)
+  ;; TODO: poll for (updi-rstsys?) here
+  (set! (resetting) #t))
+
 ;; ======================================== target registers
 ;; TODO: get all of these from a pack file or something
 ;; TODO: review if we want (set! (PC) x) or (PC x) <-- less typing
