@@ -282,7 +282,7 @@
 (define (reset!)
   (set! (resetting) #t)
   ;; TODO: poll for (updi-rstsys?) here
-  (set! (resetting) #t))
+  (set! (resetting) #f))
 
 ;; ======================================== target registers
 ;; TODO: get all of these from a pack file or something
