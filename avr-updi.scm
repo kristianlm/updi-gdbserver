@@ -275,9 +275,7 @@
 
 (define (cont!)
   ;; skipping ocd key check here (could it be stopped without a key?)
-  (STCS UPDI.DEBUG_CTRLA #b0010)
-  (when (halted?) ;; extra safety check
-    (error "OBS: could not resume target")))
+  (STCS UPDI.DEBUG_CTRLA #b0010))
 
 (define (reset!)
   (set! (resetting) #t)
