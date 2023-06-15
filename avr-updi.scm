@@ -304,7 +304,7 @@
    (lambda (r)   (LDS (+ CPU.REGISTER_FILE r) 1))
    (lambda (r v) (STS (+ CPU.REGISTER_FILE r) v 1))))
 
-(define PC    (make-register CPU.PC         1))
+(define PC    (make-register CPU.PC         2))
 (define SP    (make-register CPU.SP         1))
 (define PORTA (make-register (+ #x0400 4)   1))
 (define SREG  (make-register #x3f00 1))
