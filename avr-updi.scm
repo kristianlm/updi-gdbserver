@@ -295,7 +295,7 @@
 (define CPU.SP            #x003d) ;; CPU
 (define CPU.REGISTER_FILE #x0fa0) ;; SYSCFG
 (define CPU.PC            #x0f94) ;; SYSCFG
-(define CPU.SREG          #x3f00) ;; ?
+(define CPU.SREG          #x003f) ;; CPU
 
 (define r
   (getter-with-setter
