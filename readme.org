@@ -1,5 +1,105 @@
 
 * AVR UPDI library and cli tool
 
-This is work in progress.
 
+Only the ATTiny414 is currently supported.
+
+Use [[https://sourceware.org/gdb/][avr-gdb]] to debug your AVR programs. Follow the ordinary pymcuprog
+guidance for how to get the serial port set up to talk UPDI. Something
+like this.
+
+#+begin_src
+--------------------                                   To Target device
+                DTR|    470Ω    BAT43                 __________________
+                Rx |---------------------,-----------| UPDI
+                Tx |----/\/\-----|<|----'       ,----| Gnd
+                Vcc|---------------------------/-----| Vcc
+                CTS|                          /      |__________________
+                Gnd|-------------------------'
+-----------
+#+end_src
+
+ See [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][Serial port UPDI]] or [[https://github.com/SpenceKonde/AVR-Guidance/blob/master/UPDI/jtag2updi.md][AVR-Guidance]] for more details.
+
+** Building
+
+Unfortunately, this tool is written in an exoteric language and has
+unusual build steps. Try this:
+
+#+begin_src bash
+  > apt install chicken-bin # or pacman -S chicken or something thereof
+  > git clone https://github.com/kristianlm/updi-gdbserver
+  > cd updi-gdbserver
+  > csc -O1 gdbserver.scm
+  > # TODO: chicken-install -s -test && gdbserver instead
+#+end_src
+
+** Running
+
+With ~./gdbserver~ running, if the stars are aligned, you might be
+able to do this:
+
+#+begin_src
+> ~/profiles/avr/bin/avr-gdb -ex "target extended-remote 127.0.0.1:4444" main.elf
+Reading symbols from main.elf...
+Remote debugging using 127.0.0.1:4444
+0x0000007a in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
+187 __builtin_avr_delay_cycles(__ticks_dc);
+(gdb) bt
+#0  0x0000007a in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
+(gdb) c
+Continuing.
+^C
+Program stopped.
+0x00000078 in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
+187 __builtin_avr_delay_cycles(__ticks_dc);
+(gdb) print *(char*)0x0404
+$1 = 0 '\000'                                       <--- that's PORTA.OUT @ pin 5
+(gdb) c
+Continuing.
+^C                                              <-- that's me pressing C-c after a bit. I can see the pin toggle on my scope, but only while it's "continuing"
+Program stopped.
+0x00000060 in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
+187 __builtin_avr_delay_cycles(__ticks_dc);
+(gdb) print *(char*)0x0404                   <-- pin has gone high meanwhile
+$2 = 32 ' '
+(gdb) p $pc
+$3 = (void (*)()) 0x60 <main+26>
+(gdb) # when we update main.elf. we can program the flash (which will also reset the target)
+(gdb) load
+Loading section .text, size 0x88 lma 0x0
+Start address 0x00000000, load size 136
+Transfer rate: 521 bytes/sec, 27 bytes/write.
+#+end_src
+
+There is also a Scheme REPL where you can try things:
+
+#+begin_src scheme
+  klm@pal ~ > nc 127.0.0.1 1234
+  ;; nrepl on (./gdbserver)
+  #;> (PC)
+  96
+  #;> (SP)
+  253
+  #;> (PORTA)
+  32
+  #;> (set! (PORTA) 0)
+  #;> ;; yey! I can see pin goes low on my scope
+  #;> (memory-read* #x8000 32)
+  "\x19 \x1f\x1e\x1d\x1c\x1b\x1a\x19\x18\x17\x16\x15\x14\x13\x12"
+  #;> ;; avr assembly from start of flash
+#+end_src
+
+
+** TODO
+
+Too many to mention here, the source contains a lot of them. But a few
+important ones:
+
+- Setting breakpoints ("Z", "z")
+
+- Comunnicate memory regions to GDB somehow. Currently, avr-gdb will
+  upload flash content 32B at a time. With a 64B flash pagesize, this
+  wears the flash twice as it needs to.
+
+- Support (gdb) info io_registers
