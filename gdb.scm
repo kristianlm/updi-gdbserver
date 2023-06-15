@@ -229,6 +229,11 @@
      (lambda (addr* len* hex)
        (let ((addr (string->number addr* 16))
              (len (string->number len* 16)))
+         ;; TODO: I really don't like this. This is doomed to fail at
+         ;; some point. If PC is 0 when we load, for example, the
+         ;; cache isn't flushed. A better approach is probably to have
+         ;; gdb know which region is flash, and somehow tell it the
+         ;; flash pagesize.
          (memory-write addr (hex->string hex))
          (rsp-write "OK" op)))
      (irregex-split `(or ":" ",") (substring cmd 1))))
