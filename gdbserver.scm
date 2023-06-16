@@ -18,6 +18,7 @@
      (lambda ()
        (let loop ()
          (receive (ip op) (tcp-accept socket-listen)
+           (stop!) ;; gdb connecting - we _have_ to halt ('?')
            (let loop ()
              (let ((cmd (rsp-read ip)))
                (unless (eof-object? cmd)
