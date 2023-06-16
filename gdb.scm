@@ -29,7 +29,7 @@
        (lambda (byte index)
          (cache #:set (+ addr index) byte)))
       ;; non-flash written directly
-      (memory-write* (gdb-adr->updi-adr addr) bytes)))
+      (memory-write* (gdb-adr->updi-adr addr) bytes 1)))
 
 (define (cache-flush!)
   (let ((pages (memory-pages (cache #:memory) 64)))
