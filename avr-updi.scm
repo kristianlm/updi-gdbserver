@@ -282,7 +282,7 @@
   ;; TODO: poll for (updi-rstsys?) here
   (set! (resetting) #f))
 
-;; ======================================== target registers
+;; ======================================== ATTiny414 registers
 ;; TODO: get all of these from a pack file or something
 ;; TODO: review if we want (set! (PC) x) or (PC x) <-- less typing
 ;;       or something even better (something that could print bits too?)
@@ -304,15 +304,18 @@
 
 (define PC    (make-register CPU.PC         2))
 
-
 ;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems
 (define SP
   (getter-with-setter
    (lambda ()  (bytes->u16le (memory-read* CPU.SP 2)))
    (lambda (v) (memory-write* CPU.SP (u16le->bytes v)))))
 
-(define PORTA (make-register (+ #x0400 4)   1))
 (define SREG  (make-register #x3f00 1))
 
 (define (regs)
   (memory-read* CPU.REGISTER_FILE 32))
+
+(define VREF.CTRLA (make-register (+ #x00A0 #x00) 1))
+(define PORTA.OUT  (make-register (+ #x0400 4)   1))
+(define DAC.CTRLA  (make-register (+ #x0680 #x00) 1))
+(define DAC.DATA   (make-register (+ #x0680 #x01) 1))
