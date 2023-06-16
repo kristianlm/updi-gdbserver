@@ -1,8 +1,23 @@
-(import (only chicken.condition print-error-message))
+(import (only chicken.condition print-error-message)
+         chicken.process-context chicken.port)
 (include "avr-updi.scm")
 (include "gdb.scm")
 
-(updi-open "/dev/ttyUSB1" 100000)
+(define (usage)
+  (with-output-to-port (current-error-port)
+    (lambda ()
+      (print "usage: updi-gdbserver <tty> -b <baud>"))))
+
+(let ((cla (command-line-arguments)))
+  (if (and (= 3 (length cla))
+           (equal? "-b" (cadr cla)))
+      (let ((tty (car cla))
+            (baud (string->number (caddr cla))))
+        (updi-open tty baud))
+      (begin
+        (usage)
+        (exit 0))))
+
 (updi-break)
 
 (print "gdbserver on port 4444")
