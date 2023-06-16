@@ -303,7 +303,14 @@
    (lambda (r v) (STS (+ CPU.REGISTER_FILE r) v 1))))
 
 (define PC    (make-register CPU.PC         2))
-(define SP    (make-register CPU.SP         1))
+
+
+;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems
+(define SP
+  (getter-with-setter
+   (lambda ()  (bytes->u16le (memory-read* CPU.SP 2)))
+   (lambda (v) (memory-write* CPU.SP (u16le->bytes v)))))
+
 (define PORTA (make-register (+ #x0400 4)   1))
 (define SREG  (make-register #x3f00 1))
 
