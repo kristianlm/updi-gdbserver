@@ -316,6 +316,7 @@
   (memory-read* CPU.REGISTER_FILE 32))
 
 (define VREF.CTRLA (make-register (+ #x00A0 #x00) 1))
-(define PORTA.OUT  (make-register (+ #x0400 4)   1))
+(define PORTA.DIR  (make-register (+ #x0400 #x00) 1))
+(define PORTA.OUT  (make-register (+ #x0400 #x04) 1))
 (define DAC.CTRLA  (make-register (+ #x0680 #x00) 1))
 (define DAC.DATA   (make-register (+ #x0680 #x01) 1))
