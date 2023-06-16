@@ -99,7 +99,7 @@ communication is shown in blue. The delays between the ~dac~ calls are
 caused by UART communication. This could probably be improved by
 investigating at guard time and UPDI clock speed.
 
-** TODO
+** TODOs
 
 Too many to mention here, the source contains a lot of them. But a few
 important ones:
