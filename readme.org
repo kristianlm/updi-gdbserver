@@ -72,24 +72,32 @@ Start address 0x00000000, load size 136
 Transfer rate: 521 bytes/sec, 27 bytes/write.
 #+end_src
 
-There is also a Scheme REPL where you can try things:
+** REPL
+
+There is also a Scheme REPL available where you can experiment. I find
+it useful to poke at peripheral registers interactively from a REPL
+environment before I start writing any code meant to run on the
+target. Below is an example of using the DAC peripheral while the
+target CPU is stopped (and thus independent of any
 
 #+begin_src scheme
-  klm@pal ~ > nc 127.0.0.1 1234
+  me@workstation> rlwrap nc localhost 1234
   ;; nrepl on (./gdbserver)
-  #;> (PC)
-  96
-  #;> (SP)
-  253
-  #;> (PORTA)
-  32
-  #;> (set! (PORTA) 0)
-  #;> ;; yey! I can see pin goes low on my scope
-  #;> (memory-read* #x8000 32)
-  "\x19 \x1f\x1e\x1d\x1c\x1b\x1a\x19\x18\x17\x16\x15\x14\x13\x12"
-  #;> ;; avr assembly from start of flash
+  #;> (set! (VREF.CTRLA) 1) ;; 1.1V
+  #;> (set! (DAC.CTRLA)  #b01000001) ;; OUTEN, ENABLE
+  #;> (set! (PORTA.OUT)  #b01000000) ;; PA6 output
+  #;> (define (dac n) (set! (DAC.DATA) n))
+  #;> (begin (dac #x80) (dac #xff) (dac #x80) (dac #x00))
 #+end_src
 
+This should produce a scope trace like this:
+
+[[./images/scope-dac.png]]
+
+The DAC output is shown in purple, and the rather slow UPDI UART
+communication is shown in blue. The delays between the ~dac~ calls are
+caused by UART communication. This could probably be improved by
+investigating at guard time and UPDI clock speed.
 
 ** TODO
 
