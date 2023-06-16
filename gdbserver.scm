@@ -1,3 +1,4 @@
+(import (only chicken.condition print-error-message))
 (include "avr-updi.scm")
 (include "gdb.scm")
 
@@ -20,7 +21,12 @@
            (let loop ()
              (let ((cmd (rsp-read ip)))
                (unless (eof-object? cmd)
-                 (rsp-handle cmd op)
+                 (handle-exceptions
+                  e (begin
+                      (print-error-message e)
+                      ;; TODO: skip is already replied to packet
+                      (rsp-write "E01" op))
+                  (rsp-handle cmd op))
                  (loop)))))
          (loop))))))
 
