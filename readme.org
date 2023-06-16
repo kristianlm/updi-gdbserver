@@ -5,8 +5,8 @@
 Only the ATTiny414 is currently supported.
 
 Use [[https://sourceware.org/gdb/][avr-gdb]] to debug your AVR programs. Follow the ordinary pymcuprog
-guidance for how to get the serial port set up to talk UPDI. Something
-like this.
+guidance for how to get the serial port set up to talk
+UPDI. [[https://github.com/SpenceKonde/AVR-Guidance/blob/master/UPDI/jtag2updi.md][AVR-Guidance]] has a nice ascii diagram:
 
 #+begin_src
 --------------------                                   To Target device
@@ -19,7 +19,7 @@ like this.
 -----------
 #+end_src
 
- See [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][Serial port UPDI]] or [[https://github.com/SpenceKonde/AVR-Guidance/blob/master/UPDI/jtag2updi.md][AVR-Guidance]] for more details.
+You can also see [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][Serial port UPDI]] or for details.
 
 ** Building
 
@@ -34,42 +34,43 @@ unusual build steps. Try this:
   > # TODO: chicken-install -s -test && gdbserver instead
 #+end_src
 
-** Running
+** Running ~avr-gdb~
 
 With ~./gdbserver~ running, if the stars are aligned, you might be
-able to do this:
+able to do something this:
 
-#+begin_src
-> ~/profiles/avr/bin/avr-gdb -ex "target extended-remote 127.0.0.1:4444" main.elf
-Reading symbols from main.elf...
-Remote debugging using 127.0.0.1:4444
-0x0000007a in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
-187 __builtin_avr_delay_cycles(__ticks_dc);
-(gdb) bt
-#0  0x0000007a in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
-(gdb) c
-Continuing.
-^C
-Program stopped.
-0x00000078 in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
-187 __builtin_avr_delay_cycles(__ticks_dc);
-(gdb) print *(char*)0x0404
-$1 = 0 '\000'                                       <--- that's PORTA.OUT @ pin 5
-(gdb) c
-Continuing.
-^C                                              <-- that's me pressing C-c after a bit. I can see the pin toggle on my scope, but only while it's "continuing"
-Program stopped.
-0x00000060 in main () at /home/klm/profiles/avr/avr/include/util/delay.h:187
-187 __builtin_avr_delay_cycles(__ticks_dc);
-(gdb) print *(char*)0x0404                   <-- pin has gone high meanwhile
-$2 = 32 ' '
-(gdb) p $pc
-$3 = (void (*)()) 0x60 <main+26>
-(gdb) # when we update main.elf. we can program the flash (which will also reset the target)
-(gdb) load
-Loading section .text, size 0x88 lma 0x0
-Start address 0x00000000, load size 136
-Transfer rate: 521 bytes/sec, 27 bytes/write.
+#+begin_src ruby
+   > avr-gcc -DF_CPU=4000000 -O1 -g -mmcu=attiny414 attiny414-example.c -o attiny414-example.elf
+   > avr-gdb --eval-command "target remote 127.0.0.1:4444" attiny414-example.elf
+  GNU gdb (GDB) 12.1
+  …
+  Reading symbols from attiny414-example.elf...
+  Remote debugging using 127.0.0.1:4444
+  0x00000002 in __vectors ()
+  (gdb) load                    # <-- upload program to flash (resets target)
+  Loading section .text, size 0x86 lma 0x0
+  Start address 0x00000000, load size 134
+  Transfer rate: 509 bytes/sec, 26 bytes/write.
+  (gdb) c                       # <-- pin starts to toggle
+  Continuing.
+  ^C
+  Program stopped.              # <-- progam stops, pin toggling stops
+  0x00000076 in main () at /usr/avr/include/util/delay.h:187
+  187		__builtin_avr_delay_cycles(__ticks_dc);
+  (gdb) bt
+  #0  0x00000076 in main () at /usr/avr/include/util/delay.h:187
+  (gdb) print *(char*)0x0404    # <-- value of PORTA.OUT (why doesn't gdb have it?)
+  $1 = 0 '\000'                 # <-- pin was low on break
+  (gdb) c
+  Continuing.
+  ^C                            # <-- stopping program again when pin was high
+  Program stopped.
+  0x0000005e in main () at /usr/avr/include/util/delay.h:187
+  187		__builtin_avr_delay_cycles(__ticks_dc);
+  (gdb) print *(char*)0x0404
+  $2 = 64 '@'                   # <-- pin 6 high, as seen on scope!
+  (gdb) set *(char*)0x0404 = 0  # <-- watch pin 6 go back low
+  (gdb) set *(char*)0x0404 = 64 # <-- and back up
 #+end_src
 
 ** REPL
@@ -78,16 +79,18 @@ There is also a Scheme REPL available where you can experiment. I find
 it useful to poke at peripheral registers interactively from a REPL
 environment before I start writing any code meant to run on the
 target. Below is an example of using the DAC peripheral while the
-target CPU is stopped (and thus independent of any
+target CPU is stopped.
 
 #+begin_src scheme
   me@workstation> rlwrap nc localhost 1234
   ;; nrepl on (./gdbserver)
-  #;> (set! (VREF.CTRLA) 1) ;; 1.1V
-  #;> (set! (DAC.CTRLA)  #b01000001) ;; OUTEN, ENABLE
-  #;> (set! (PORTA.OUT)  #b01000000) ;; PA6 output
-  #;> (define (dac n) (set! (DAC.DATA) n))
-  #;> (begin (dac #x80) (dac #xff) (dac #x80) (dac #x00))
+  #> (updi-break)
+  #> (stop!)
+  #> (set! (VREF.CTRLA) 1) ;; 1.1V
+  #> (set! (DAC.CTRLA)  #b01000001) ;; OUTEN, ENABLE
+  #> (set! (PORTA.OUT)  #b01000000) ;; PA6 output
+  #> (define (dac n) (set! (DAC.DATA) n))
+  #> (begin (dac #x80) (dac #xff) (dac #x80) (dac #x00))
 #+end_src
 
 This should produce a scope trace like this:
@@ -104,10 +107,12 @@ investigating at guard time and UPDI clock speed.
 Too many to mention here, the source contains a lot of them. But a few
 important ones:
 
-- Setting breakpoints ("Z", "z")
+- Setting breakpoints (~Z~, ~z~)
 
 - Comunnicate memory regions to GDB somehow. Currently, avr-gdb will
   upload flash content 32B at a time. With a 64B flash pagesize, this
   wears the flash twice as it needs to.
 
 - Support (gdb) info io_registers
+
+- Many, many more.
