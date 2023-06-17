@@ -315,6 +315,18 @@
 (define (regs)
   (memory-read* CPU.REGISTER_FILE 32))
 
+;; TODO: make nice api for detecting device, based on the 24-bit signature.
+;;
+;; (string->blob (memory-read* #x1100 3))
+;; => #${1e9223}
+;; which is nice, it matches the at-pack files ATtiny412.atdf:
+;;
+;;  <property-group name="SIGNATURES">
+;;    <property name="SIGNATURE0" value="0x1E"/>
+;;    <property name="SIGNATURE1" value="0x92"/>
+;;    <property name="SIGNATURE2" value="0x23"/>
+;; </property-group>
+
 (define VREF.CTRLA (make-register (+ #x00A0 #x00) 1))
 (define PORTA.DIR  (make-register (+ #x0400 #x00) 1))
 (define PORTA.OUT  (make-register (+ #x0400 #x04) 1))
