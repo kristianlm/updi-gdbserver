@@ -40,11 +40,11 @@ With ~./gdbserver~ running, if the stars are aligned, you might be
 able to do something this:
 
 #+begin_src ruby
-   > avr-gcc -DF_CPU=4000000 -O1 -g -mmcu=attiny414 attiny414-example.c -o attiny414-example.elf
-   > avr-gdb --eval-command "target remote 127.0.0.1:4444" attiny414-example.elf
+   > avr-gcc -DF_CPU=4000000 -O1 -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
+   > avr-gdb --eval-command "target remote 127.0.0.1:4444" example-led-blink.elf
   GNU gdb (GDB) 12.1
   …
-  Reading symbols from attiny414-example.elf...
+  Reading symbols from example-led-blink.elf...
   Remote debugging using 127.0.0.1:4444
   0x00000002 in __vectors ()
   (gdb) load                    # <-- upload program to flash (resets target)
