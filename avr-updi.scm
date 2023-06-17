@@ -25,7 +25,7 @@
 ;;    (lambda (baud) (tty-setup (current-updi-fd) baud))))
 
 ;; (updi-open "/dev/ttyUSB1" 100000)
-(define (updi-open tty baudrate)  
+(define (updi-open tty baudrate)
   (let ((fd (file-open tty open/rdwr)))
     (tty-setup fd baudrate)
     (current-updi (%make-updi fd))
@@ -65,7 +65,7 @@
     (when (tty-data-available? fd)
       (print "OBS: data available " (file-read-retrying fd 1))
       (loop)))
-  
+
   (file-write fd data)
   (let ((echo (file-read-retrying fd (number-of-bytes data))))
     (unless (equal? echo data)
@@ -259,7 +259,7 @@
 
 
 ;; ======================================== "popular" target commands
-         
+
 (define (halted?)
   (let ((CTRLA (LDCS UPDI.DEBUG_STATUSA)))
     (cond ((= CTRLA 0) #f)
