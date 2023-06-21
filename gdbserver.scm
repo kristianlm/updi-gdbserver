@@ -18,8 +18,6 @@
         (usage)
         (exit 0))))
 
-(updi-break)
-
 (print "gdbserver on port 4444")
 
 (define socket-listen (tcp-listen 4444))
@@ -33,6 +31,7 @@
      (lambda ()
        (let loop ()
          (receive (ip op) (tcp-accept socket-listen)
+           (updi-break)
            (stop!) ;; gdb connecting - we _have_ to halt ('?')
            (let loop ()
              (let ((cmd (rsp-read ip)))
