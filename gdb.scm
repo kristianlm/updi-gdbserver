@@ -7,6 +7,8 @@
 
 (include "pages.scm")
 
+(define (string-prefix? s prefix) (substring=? s prefix 0 0 (string-length prefix)))
+
 ;; gdb-addressing (flash starting at 0x00)
 (define cache (make-memory-cache #x1000)) ;; <-- TODO actual target size
 
@@ -163,7 +165,7 @@
     (cache-flush!)
     ;; don't rsp-write here! reply at upcoming breakpoint or 'break
     (cont!))
-   
+
    ((equal? cmd "qAttached") ;; attached to existing "process"?
     (cache-flush!)
     (rsp-write "1" op))
@@ -184,13 +186,13 @@
                op))
 
    ;; get memory region
-   ;;((substring=? cmd "m"))
+   ;;((string-prefix? cmd "m"))
 
    ;; get register value
-   ;;((substring=? cmd "p") (error "TODO p (get register)"))
+   ;;((string-prefix? cmd "p") (error "TODO p (get register)"))
 
    ;; store register value
-   ((and (string? cmd) (substring=? cmd "P"))
+   ((and (string? cmd) (string-prefix? cmd "P"))
     (cache-flush!)
     (apply
      (lambda (R value)
@@ -202,7 +204,7 @@
    ;; "OK" => OK, no output
    ;; "xxXXxxXX" hex string => normal output
    ;; "E xx" => error
-   ((and (string? cmd) (substring=? cmd "qRcmd,"))    
+   ((and (string? cmd) (string-prefix? cmd "qRcmd,"))
     (cache-flush!)
     (apply
      (lambda (_ #!optional (hex ""))
@@ -212,7 +214,7 @@
         op))
      (irregex-split `(",") cmd)))
 
-   ((and (string? cmd) (substring=? cmd "m"))
+   ((and (string? cmd) (string-prefix? cmd "m"))
     (cache-flush!)
     (apply
      (lambda (addr len)
@@ -220,11 +222,11 @@
      (cmd-args cmd ",")))
 
    ;; TODO: support X for less hex parsing and stuff maybe
-   ;;((and (string? cmd) (substring=? cmd "X")))
-   
+   ;;((and (string? cmd) (string-prefix? cmd "X")))
+
    ;; store to memory (hex)
    ;; eg "M80,8:0000e5cff894ffcf"
-   ((and (string? cmd) (substring=? cmd "M"))
+   ((and (string? cmd) (string-prefix? cmd "M"))
     (apply
      (lambda (addr* len* hex)
        (let ((addr (string->number addr* 16))
