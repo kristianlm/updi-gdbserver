@@ -131,22 +131,6 @@
       (for-each (lambda (c) (display (pad-left (number->string (char->integer c) 16) 2 #\0)))
                 (string->list s)))))
 
-;; generic "bytes to value (le)".
-;; (->value "2") => 2
-;; (->value "0100") => #x0001
-(define (->value str)
-  (if (= 1 (number-of-bytes str))
-      (string->number str 16)
-      (bytes->le (hex->string str))))
-
-;; (cmd-args "m8000fe,2" ",") => (8388862 2)
-;; (cmd-args "P4=64" "=")     => (4 100)
-;; (cmd-args "P21=0100" "=")  => (4 100)
-(define (cmd-args cmd separator)
-  (map ->value
-       (irregex-split (if (string? separator) `(,separator) separator)
-                      (substring cmd 1))))
-
 (define gdb-ram-start #x800000)
 ;; (gdb-adr->updi-adr #x8000fe) => #x80fe
 ;; (gdb-adr->updi-adr #x27) => #x80fe
@@ -234,16 +218,22 @@
    ;; get register value
    ;;((string-prefix? cmd "p") (error "TODO p (get register)"))
 
-   ;; store register value
-   ((and (string? cmd) (string-prefix? cmd "P"))
-    (cache-flush!)
-    (apply
-     (lambda (R value)
-       (cond ((= R #x22) (set! (PC) value))
-             ((= R #x21) (set! (SP) value))
-             (else (set! (r R) value)))
-       (rsp-write "OK" op))
-     (cmd-args cmd "=")))
+   ;; TODO: clean this up (and generalize?)
+   ;; store register value, eg "P21=0a00"
+   ((irregex-match `(: "P" (=> R (* xdigit)) "=" (=> hex (* xdigit))) cmd) =>
+    (lambda (m)
+      (let* ((R (string->number (irregex-match-substring m 'R) 16))
+             (hex (irregex-match-substring m 'hex))
+             (blob (hex->string hex))
+             (value (if (= 1 (number-of-bytes blob))
+                        (bytes->u8 blob)
+                        (bytes->u16le blob))))
+        (print "R = " R " "(wrt value))
+        (cache-flush!)
+        (cond ((= R #x22) (set! (PC) value))
+              ((= R #x21) (set! (SP) value))
+              (else (set! (r R) value)))
+        (rsp-write "OK" op))))
 
    ;; (gdb) monitor reset => "qRcmd,7265736574"
    ;; "OK" => OK, no output
@@ -259,59 +249,66 @@
         op))
      (irregex-split `(",") cmd)))
 
-   ((and (string? cmd) (string-prefix? cmd "m"))
-    (cache-flush!)
-    (apply
-     (lambda (addr len)
-       (rsp-write (string->hex (memory-read* (gdb-adr->updi-adr addr) len)) op))
-     (cmd-args cmd ",")))
+   ;; read memory, eg. "m4c,2"
+   ((irregex-match `(: "m" (=> addr (* xdigit))
+                       "," (=> len (* xdigit))) cmd)
+    => (lambda (m)
+         (let* ((addr (string->number (irregex-match-substring m 'addr) 16))
+                (len  (string->number (irregex-match-substring m 'len) 16)))
+           (cache-flush!)
+           (rsp-write (string->hex (memory-read* (gdb-adr->updi-adr addr) len)) op))))
 
    ;; TODO: support X for less hex parsing and stuff maybe
    ;;((and (string? cmd) (string-prefix? cmd "X")))
 
    ;; store to memory (hex)
    ;; eg "M80,8:0000e5cff894ffcf"
-   ((and (string? cmd) (string-prefix? cmd "M"))
-    (apply
-     (lambda (addr* len* hex)
-       (let ((addr (string->number addr* 16))
-             (len (string->number len* 16)))
-         ;; TODO: I really don't like this. This is doomed to fail at
-         ;; some point. If PC is 0 when we load, for example, the
-         ;; cache isn't flushed. A better approach is probably to have
-         ;; gdb know which region is flash, and somehow tell it the
-         ;; flash pagesize.
-         (memory-write addr (hex->string hex))
-         (rsp-write "OK" op)))
-     (irregex-split `(or ":" ",") (substring cmd 1))))
+   ((irregex-match `(: "M" (=> addr (* xdigit))
+                       "," (=> len (* xdigit))
+                       ":" (=> hex (* xdigit))) cmd)
+    => (lambda (m)
+         (let* ((addr (string->number (irregex-match-substring m 'addr) 16))
+                (len  (string->number (irregex-match-substring m 'len) 16))
+                (blob (hex->string    (irregex-match-substring m 'hex))))
+           ;; TODO: I really don't like this. This is doomed to fail at
+           ;; some point. If PC is 0 when we load, for example, the
+           ;; cache isn't flushed. A better approach is probably to have
+           ;; gdb know which region is flash, and somehow tell it the
+           ;; flash pagesize.
+           (memory-write addr blob)
+           (rsp-write "OK" op))))
 
-   ;; set breakpoint. eg. (cmd-args "Z0,4e,2" ",")
-   ((and (string? cmd) (string-prefix? cmd "Z"))
-    (let* ((args     (cmd-args cmd ","))
-           (type     (car args))
-           (address  (cadr args))
-           (kind     (caddr args)))
-      (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
-      (cond ((= type 0) (rsp-write "" op)) ;; sw bp
-            ((= type 1)                    ;; hw bp
-             (set! (BP 1) (+ address 1)) ;; what the heck!?
-             (rsp-write "OK" op))
-            ;; type 2, 3, 4: watchpoints (read, write, access)
-            (else (rsp-write "" op)))))
+   ;; set breakpoint. eg. "Z0,4e,2"
+   ((irregex-match `(: "Z" (=> type xdigit)
+                       "," (=> address (* xdigit))
+                       "," (=> kind (* xdigit))) cmd)
+    => (lambda (m)
+         (let* ((type    (string->number (irregex-match-substring m 'type)    16))
+                (address (string->number (irregex-match-substring m 'address) 16))
+                (kind    (string->number (irregex-match-substring m 'kind)    16)))
+           (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
+           (cond ((= type 0) (rsp-write "" op)) ;; sw bp
+                 ((= type 1)                    ;; hw bp
+                  (set! (BP 1) (+ address 1))   ;; what the heck!?
+                  (rsp-write "OK" op))
+                 ;; type 2, 3, 4: watchpoints (read, write, access)
+                 (else (rsp-write "" op))))))
 
-   ;; remove breakpoint (cmd-args "z1,4e,2" ",")
-   ((and (string? cmd) (string-prefix? cmd "z"))
-    (let* ((args     (cmd-args cmd ","))
-           (type     (car args))
-           (address  (cadr args))
-           (kind     (caddr args)))
-      (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
-      (cond ((= type 0) (rsp-write "" op)) ;; sw bp
-            ((= type 1)                    ;; hw bp
-             (set! (BP 1) 0)
-             (rsp-write "OK" op))
-            ;; type 2, 3, 4: watchpoints (read, write, access)
-            (else (rsp-write "" op)))))
+   ;; remove breakpoint "z1,4e,2")
+   ((irregex-match `(: "z" (=> type xdigit)
+                       "," (=> address (* xdigit))
+                       "," (=> kind (* xdigit))) cmd)
+    => (lambda (m)
+         (let* ((type    (string->number (irregex-match-substring m 'type)    16))
+                (address (string->number (irregex-match-substring m 'address) 16))
+                (kind    (string->number (irregex-match-substring m 'kind)    16)))
+           (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
+           (cond ((= type 0) (rsp-write "" op)) ;; sw bp
+                 ((= type 1)                    ;; hw bp
+                  (set! (BP 1) 0)
+                  (rsp-write "OK" op))
+                 ;; type 2, 3, 4: watchpoints (read, write, access)
+                 (else (rsp-write "" op))))))
 
    ;; empty packet reply for unknown commands (of which there are
    ;; _a lot_.
