@@ -115,4 +115,6 @@ important ones:
 
 - Support (gdb) info io_registers
 
+- Integrate with chicken-debugwire? If the API can be generalized.
+
 - Many, many more.

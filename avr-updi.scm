@@ -154,7 +154,7 @@
 ;; (memory-write* #x3f10 "hei" 1)
 ;; (memory-read* #x3f0f 5)
 (define (memory-write* address data blocksize)
-  (unless (= blocksize 1) (error "TODO: blocksize ≠ 2"))
+  (unless (= blocksize 1) (error "TODO: blocksize must be 1" blocksize))
   (let ((len (number-of-bytes data)))
     (unless (<=  len #xff) (error "data size must be ≤ #xFF" len))
     (ST-ptr address 2)
@@ -275,13 +275,13 @@
 
 (define (cont!)
   ;; skipping ocd key check here (could it be stopped without a key?)
-  (STS #x0f88 #b0000010 1) ;; continue until breakpoint
+  (STS #x0f88 #b00000010 1) ;; OCD: continue until breakpoint
   (STCS UPDI.DEBUG_CTRLA #b0010))
 
 ;; warning: this number if guessed. Microchip/Atmel Studio has no
 ;; "single step 1 CPU instruction" button.
 (define (step!)
-  (STS #x0f88 #b00000100 1) ;; step single CPU cycle
+  (STS #x0f88 #b00000100 1) ;; OCD: step single CPU cycle
   (STCS UPDI.DEBUG_CTRLA #b0010))
 
 (define (reset!)
