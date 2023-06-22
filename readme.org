@@ -113,6 +113,9 @@ important ones:
   upload flash content 32B at a time. With a 64B flash pagesize, this
   wears the flash twice as it needs to.
 
+- Find out what register ~#x0f90~ is for (stores opcode?) Can we run
+  arbitrary instructions on the target CPU from there?
+
 - Support (gdb) info io_registers
 
 - Integrate with chicken-debugwire? If the API can be generalized.

@@ -207,6 +207,7 @@
                   (thread-sleep! 0.05) ;; polling 100 fps
                   (loop)))))))
 
+   ;; TODO "D" for detatch
 
    ((equal? cmd "qAttached") ;; attached to existing "process"?
     (cache-flush!)
