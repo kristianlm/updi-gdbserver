@@ -161,6 +161,10 @@
     (stop!)
     (rsp-write "S00" op))
 
+   ((equal? cmd "s")
+    (step!) ;;   ,-- this is a magic, undocumented, number
+    (rsp-write "S05" op))
+
    ((equal? cmd "c")
     (cache-flush!)
     ;; don't rsp-write here! reply at upcoming breakpoint or 'break
