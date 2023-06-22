@@ -224,9 +224,9 @@
     (rsp-write (string->hex
                 (->bytes
                  (regs) ;; r0 - r31
-                 (   u8->bytes (SREG))
-                 (u16le->bytes (SP))
-                 (u16le->bytes (PC))
+                 (   u8->bytes (get CPU.SREG))
+                 (u16le->bytes (get SP))
+                 (u16le->bytes (get PC))
                  0 0)) ;; <-- mystery registers (from dwtk / dwire-debug)
                op))
 
@@ -246,9 +246,9 @@
              (value (if (= 1 (number-of-bytes blob))
                         (bytes->u8 blob)
                         (bytes->u16le blob))))
-        (cond ((= R #x22) (set! (PC) value))
-              ((= R #x21) (set! (SP) value))
-              (else (set! (r R) value)))
+        (cond ((= R #x22) (set PC value))
+              ((= R #x21) (set SP value))
+              (else (set (r R) value)))
         (rsp-write "OK" op))))
 
    ;; (gdb) monitor reset => "qRcmd,7265736574"

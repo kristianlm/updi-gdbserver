@@ -302,10 +302,13 @@
 ;; TODO: clean this up
 (define CPU.REGISTER_FILE #x0fa0) ;; SYSCFG
 (define (regs) (memory-read* CPU.REGISTER_FILE 32))
-(define r
-  (getter-with-setter
-   (lambda (r)   (LDS (+ CPU.REGISTER_FILE r) 1))
-   (lambda (r v) (STS (+ CPU.REGISTER_FILE r) v 1))))
+(define (r R)
+  (let ((addr (+ CPU.REGISTER_FILE R)))
+    (register (string->symbol (conc "r" R))
+              addr
+              (lambda (r) (LDS addr 1))
+              (lambda (r v) (STS addr v 2))
+              (lambda (r p) (reg-default-printer/u8 r p)))))
 
 ;; definition: the PC points to the instruction which is about to be
 ;; executed. TODO: review setting PC
@@ -330,6 +333,7 @@
                   (display "≡" port)
                   (display (string-pad (number->string value 16) 4 #\0) port))))))
 
+;; TODO: turn into register like for (r 24)
 (define BP
   (getter-with-setter
    (lambda (bp)
@@ -343,3 +347,5 @@
            ((= bp 1) (STS #x0f84 location 2))
            (else (error "unsupported bp (only 0/1 supported) " bp))))))
 
+;; this is really target-specific but hopefully won't change.
+(define CPU.SREG (register 'CPU.SREG #x003f))
