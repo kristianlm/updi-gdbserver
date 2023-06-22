@@ -316,7 +316,13 @@
    (lambda (r)   (LDS (+ CPU.REGISTER_FILE r) 1))
    (lambda (r v) (STS (+ CPU.REGISTER_FILE r) v 1))))
 
-(define PC    (make-register CPU.PC         2))
+;; definition: the PC points to the instruction which is about to be
+;; executed. TODO: review setting PC
+(define PC ;; see test-bp.scm for an explanation of the -2
+  (let ((addr #x0f94))
+    (getter-with-setter
+     (lambda ()  (- (LDS addr   2) 2))
+     (lambda (v) (STS addr (+ v 2) 2)))))
 
 ;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems
 (define SP
