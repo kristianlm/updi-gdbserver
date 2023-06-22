@@ -328,7 +328,7 @@
 (define SP
   (getter-with-setter
    (lambda ()  (bytes->u16le (memory-read* CPU.SP 2)))
-   (lambda (v) (memory-write* CPU.SP (u16le->bytes v)))))
+   (lambda (v) (memory-write* CPU.SP (u16le->bytes v) 1))))
 
 (define SREG  (make-register #x3f00 1))
 
