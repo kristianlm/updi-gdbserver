@@ -39,38 +39,36 @@ unusual build steps. Try this:
 With ~./gdbserver~ running, if the stars are aligned, you might be
 able to do something this:
 
-#+begin_src ruby
-   > avr-gcc -DF_CPU=4000000 -O1 -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
-   > avr-gdb --eval-command "target remote 127.0.0.1:4444" example-led-blink.elf
+#+begin_src C
+  > avr-gcc -DF_CPU=1000000 -Os -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
+  > avr-gdb --eval-command "target remote 127.0.0.1:4444" --eval-command "load" example-led-blink.elf
   GNU gdb (GDB) 12.1
   …
   Reading symbols from example-led-blink.elf...
   Remote debugging using 127.0.0.1:4444
-  0x00000002 in __vectors ()
-  (gdb) load                    # <-- upload program to flash (resets target)
-  Loading section .text, size 0x86 lma 0x0
-  Start address 0x00000000, load size 134
-  Transfer rate: 509 bytes/sec, 26 bytes/write.
-  (gdb) c                       # <-- pin starts to toggle
-  Continuing.
-  ^C
-  Program stopped.              # <-- progam stops, pin toggling stops
-  0x00000076 in main () at /usr/avr/include/util/delay.h:187
-  187		__builtin_avr_delay_cycles(__ticks_dc);
-  (gdb) bt
-  #0  0x00000076 in main () at /usr/avr/include/util/delay.h:187
-  (gdb) print *(char*)0x0404    # <-- value of PORTA.OUT (why doesn't gdb have it?)
-  $1 = 0 '\000'                 # <-- pin was low on break
+  0x00000000 in __vectors ()
+  Loading section .text, size 0x7e lma 0x0
+  Start address 0x00000000, load size 126
+  Transfer rate: 88 bytes/sec, 42 bytes/write.
+  (gdb) print $pc
+  $1 = (void (*)()) 0x0 <__vectors>
+  (gdb) monitor (reset!)
+  #<unspecified>
+  (gdb) hbreak example-led-blink.c:7
+  Hardware assisted breakpoint 1 at 0x4c: file example-led-blink.c, line 7.
+  (gdb) i br
+  Num     Type           Disp Enb Address    What
+  1       hw breakpoint  keep y   0x0000004c in main at example-led-blink.c:7
   (gdb) c
   Continuing.
-  ^C                            # <-- stopping program again when pin was high
-  Program stopped.
-  0x0000005e in main () at /usr/avr/include/util/delay.h:187
-  187		__builtin_avr_delay_cycles(__ticks_dc);
-  (gdb) print *(char*)0x0404
-  $2 = 64 '@'                   # <-- pin 6 high, as seen on scope!
-  (gdb) set *(char*)0x0404 = 0  # <-- watch pin 6 go back low
-  (gdb) set *(char*)0x0404 = 64 # <-- and back up
+
+  Breakpoint 1, main () at example-led-blink.c:7
+  7	    PORTA.OUT |=  (1 << PIN6_bp); _delay_ms(100);
+  (gdb) c
+  Continuing.
+
+  Breakpoint 1, main () at example-led-blink.c:7
+  7	    PORTA.OUT |=  (1 << PIN6_bp); _delay_ms(100);
 #+end_src
 
 ** REPL
