@@ -115,6 +115,8 @@ important ones:
 
 - Detect target device automatically (based on the 24-bit signature)
 
+- registers: track bitfields and pretty-print
+
 - Find out what register ~#x0f90~ is for (stores opcode?) Can we run
   arbitrary instructions on the target CPU from there?
 
