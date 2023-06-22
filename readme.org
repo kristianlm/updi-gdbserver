@@ -107,7 +107,7 @@ investigating at guard time and UPDI clock speed.
 Too many to mention here, the source contains a lot of them. But a few
 important ones:
 
-- Setting breakpoints (~Z~, ~z~)
+- Support multiple hardware breakpoints
 
 - Comunnicate memory regions to GDB somehow. Currently, avr-gdb will
   upload flash content 32B at a time. With a 64B flash pagesize, this

@@ -157,7 +157,7 @@
         ;;            flash space
         (else (+ addr #x8000))))
 
-(define (rsp-handle cmd op)
+(define (rsp-handle cmd ip op)
   (unless (equal? cmd 'ack)
     (file-write 1 (conc " » " (wrt cmd) "\n")))
 
@@ -176,8 +176,37 @@
 
    ((equal? cmd "c")
     (cache-flush!)
-    ;; don't rsp-write here! reply at upcoming breakpoint or 'break
-    (cont!))
+    (cont!)
+
+    ;; the target doesn't tell us when it's stopped. we have to keep
+    ;; asking.
+    (let* ((ss '("-" "\\" "|" "/"))
+           (s ss)
+           (bars (lambda () ;; indicate we're polling for clarity
+                   (display (conc "\r" (car s)))
+                   (set! s (cdr s))
+                   (unless (pair? s) (set! s ss))
+                   (flush-output))))
+
+      ;; poll for halted CPU and GDB break
+      (let loop ()
+        (bars)
+        (if (char-ready? ip)
+            (let ((packet (rsp-read ip)))
+              (if (equal? packet 'break)
+                  (begin
+                    (file-write 1 (conc " » " 'break "\n"))
+                    (stop!)
+                    ;; "Program stopped." vs "Program received signal …"
+                    (rsp-write "S02" op))
+                  (error "unexpected GDB packet during continue" packet)))
+            (if (halted?)
+                (begin ;; SIGTRAP (breakpoint trap)
+                  (rsp-write "S05" op))
+                (begin
+                  (thread-sleep! 0.05) ;; polling 100 fps
+                  (loop)))))))
+
 
    ((equal? cmd "qAttached") ;; attached to existing "process"?
     (cache-flush!)
@@ -254,7 +283,35 @@
          (memory-write addr (hex->string hex))
          (rsp-write "OK" op)))
      (irregex-split `(or ":" ",") (substring cmd 1))))
-   
+
+   ;; set breakpoint. eg. (cmd-args "Z0,4e,2" ",")
+   ((and (string? cmd) (string-prefix? cmd "Z"))
+    (let* ((args     (cmd-args cmd ","))
+           (type     (car args))
+           (address  (cadr args))
+           (kind     (caddr args)))
+      (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
+      (cond ((= type 0) (rsp-write "" op)) ;; sw bp
+            ((= type 1)                    ;; hw bp
+             (set! (BP 1) (+ address 1)) ;; what the heck!?
+             (rsp-write "OK" op))
+            ;; type 2, 3, 4: watchpoints (read, write, access)
+            (else (rsp-write "" op)))))
+
+   ;; remove breakpoint (cmd-args "z1,4e,2" ",")
+   ((and (string? cmd) (string-prefix? cmd "z"))
+    (let* ((args     (cmd-args cmd ","))
+           (type     (car args))
+           (address  (cadr args))
+           (kind     (caddr args)))
+      (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
+      (cond ((= type 0) (rsp-write "" op)) ;; sw bp
+            ((= type 1)                    ;; hw bp
+             (set! (BP 1) 0)
+             (rsp-write "OK" op))
+            ;; type 2, 3, 4: watchpoints (read, write, access)
+            (else (rsp-write "" op)))))
+
    ;; empty packet reply for unknown commands (of which there are
    ;; _a lot_.
    (else (rsp-write "" op))))

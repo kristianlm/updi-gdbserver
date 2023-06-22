@@ -335,6 +335,19 @@
 (define (regs)
   (memory-read* CPU.REGISTER_FILE 32))
 
+(define BP
+  (getter-with-setter
+   (lambda (bp)
+     (cond ((= bp 0) (LDS #x0f80 2))
+           ((= bp 1) (LDS #x0f84 2))
+           (else (error "unsupported bp (only 0/1 supported) " bp))))
+   (lambda (bp location)
+     (unless (or (= 1 (remainder location 2)) (= 0 location))
+       (warning "breakpoint location on even address" location))
+     (cond ((= bp 0) (STS #x0f80 location 2))
+           ((= bp 1) (STS #x0f84 location 2))
+           (else (error "unsupported bp (only 0/1 supported) " bp))))))
+
 ;; TODO: make nice api for detecting device, based on the 24-bit signature.
 ;;
 ;; (string->blob (memory-read* #x1100 3))
