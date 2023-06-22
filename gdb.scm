@@ -294,27 +294,27 @@
 
    ;; set breakpoint. eg. "Z0,4e,2"
    ((irregex-match `(: "Z" (=> type xdigit)
-                       "," (=> address (* xdigit))
+                       "," (=> addr (* xdigit))
                        "," (=> kind (* xdigit))) cmd)
     => (lambda (m)
-         (let* ((type    (string->number (irregex-match-substring m 'type)    16))
-                (address (string->number (irregex-match-substring m 'address) 16))
-                (kind    (string->number (irregex-match-substring m 'kind)    16)))
+         (let* ((type (string->number (irregex-match-substring m 'type)    16))
+                (addr (string->number (irregex-match-substring m 'addr) 16))
+                (kind (string->number (irregex-match-substring m 'kind)    16)))
            (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
            (cond ((= type 0) (rsp-write "" op)) ;; sw bp
                  ((= type 1)                    ;; hw bp
-                  (set! (BP 1) (+ address 1))   ;; what the heck!?
+                  (set! (BP 1) (+ addr 1))   ;; what the heck!?
                   (rsp-write "OK" op))
                  ;; type 2, 3, 4: watchpoints (read, write, access)
                  (else (rsp-write "" op))))))
 
    ;; remove breakpoint "z1,4e,2")
    ((irregex-match `(: "z" (=> type xdigit)
-                       "," (=> address (* xdigit))
+                       "," (=> addr (* xdigit))
                        "," (=> kind (* xdigit))) cmd)
     => (lambda (m)
          (let* ((type    (string->number (irregex-match-substring m 'type)    16))
-                (address (string->number (irregex-match-substring m 'address) 16))
+                (addr (string->number (irregex-match-substring m 'addr) 16))
                 (kind    (string->number (irregex-match-substring m 'kind)    16)))
            (unless (= 2 kind) (error "unexpected breakpoint kind: " kind))
            (cond ((= type 0) (rsp-write "" op)) ;; sw bp
