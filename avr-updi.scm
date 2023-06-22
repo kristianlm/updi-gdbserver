@@ -343,14 +343,3 @@
            ((= bp 1) (STS #x0f84 location 2))
            (else (error "unsupported bp (only 0/1 supported) " bp))))))
 
-;; TODO: make nice api for detecting device, based on the 24-bit signature.
-;;
-;; (string->blob (memory-read* #x1100 3))
-;; => #${1e9223}
-;; which is nice, it matches the at-pack files ATtiny412.atdf:
-;;
-;;  <property-group name="SIGNATURES">
-;;    <property name="SIGNATURE0" value="0x1E"/>
-;;    <property name="SIGNATURE1" value="0x92"/>
-;;    <property name="SIGNATURE2" value="0x23"/>
-;; </property-group>
