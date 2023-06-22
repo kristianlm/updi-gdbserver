@@ -191,7 +191,11 @@
                   (thread-sleep! 0.05) ;; polling 100 fps
                   (loop)))))))
 
-   ;; TODO "D" for detatch
+   ;; TODO: Strictly speaking, we should (cont!). But it's nice to use
+   ;; the repl and GDB concurrently, and this is less intrusive.
+   ((equal? cmd "D")
+    (cache-flush!)
+    (rsp-write "OK" op))
 
    ((equal? cmd "qAttached") ;; attached to existing "process"?
     (cache-flush!)
