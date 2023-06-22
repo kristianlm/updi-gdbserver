@@ -286,8 +286,15 @@
 
 (define (reset!)
   (set! (resetting) #t)
-  ;; TODO: poll for (updi-rstsys?) here
-  (set! (resetting) #f))
+  (let loop ()
+    (unless (updi-rstsys?)
+      (thread-sleep! 0.1)
+      (loop)))
+  (set! (resetting) #f)
+  (let loop ()
+    (when (updi-rstsys?)
+      (thread-sleep! 0.1)
+      (loop))))
 
 ;; ======================================== ATTiny414 registers
 ;; TODO: get all of these from a pack file or something
