@@ -33,6 +33,7 @@
       ;; non-flash written directly
       (memory-write* (gdb-adr->updi-adr addr) bytes 1)))
 
+;; TODO: move this into pages.scm
 (define (cache-flush!)
   (let ((pages (memory-pages (cache #:memory) 64)))
     (pages-write pages
@@ -54,6 +55,12 @@
   (parameterize ((tcp-read-timeout #f))
     (read-char ip)))
 
+;; TODO: escape these binary characters
+(eq? c #\#)
+(eq? c #\$)
+(eq? c #\})
+(eq? c #\*)
+
 (define (rsp-expect ip expected)
   (let ((actual (read-char* ip)))
     (unless (equal? expected actual)
@@ -64,6 +71,8 @@
     ;;(print "TODO CHECKSUM: " (wrt cs))
     cs))
 
+;; TODO: chunk this up into, for example, `(M 1234 "blob") here
+;; instead?
 ;; https://sourceware.org/gdb/onlinedocs/gdb/Overview.html#Overview
 ;; "$" packet "#" checksum
 ;; and https://sourceware.org/gdb/onlinedocs/gdb/Overview.html#Binary-Data
@@ -111,7 +120,7 @@
   (let* ((cs* (number->string (string-checksum pkg) 16))
          (cs  (pad-left cs* 2 #\0))
          (frame (conc "$" pkg "#" cs)))
-    (file-write 1 (conc "« \x1b[31m " (wrt frame) "\x1b[0m\n"))
+    (file-write 1 (conc "« \x1b[30m " (wrt frame) "\x1b[0m\n"))
     (display frame op)
     (flush-output op)))
 
@@ -237,7 +246,6 @@
              (value (if (= 1 (number-of-bytes blob))
                         (bytes->u8 blob)
                         (bytes->u16le blob))))
-        (print "R = " R " "(wrt value))
         (cond ((= R #x22) (set! (PC) value))
               ((= R #x21) (set! (SP) value))
               (else (set! (r R) value)))
