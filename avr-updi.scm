@@ -7,6 +7,7 @@
 
 (include "tty.scm")
 (include "bytes.scm")
+(include "registers.scm")
 (define (wrt x) (with-output-to-string (lambda () (write x))))
 
 ;; ========================================
@@ -296,21 +297,11 @@
       (thread-sleep! 0.1)
       (loop))))
 
-;; ======================================== ATTiny414 registers
-;; TODO: get all of these from a pack file or something
-;; TODO: review if we want (set! (PC) x) or (PC x) <-- less typing
-;;       or something even better (something that could print bits too?)
+;; ======================================== target registers
 
-(define (make-register addr len)
-  (getter-with-setter
-   (lambda ()  (LDS addr   len))
-   (lambda (v) (STS addr v len))))
-
-(define CPU.SP            #x003d) ;; CPU
+;; TODO: clean this up
 (define CPU.REGISTER_FILE #x0fa0) ;; SYSCFG
-(define CPU.PC            #x0f94) ;; SYSCFG
-(define CPU.SREG          #x003f) ;; CPU
-
+(define (regs) (memory-read* CPU.REGISTER_FILE 32))
 (define r
   (getter-with-setter
    (lambda (r)   (LDS (+ CPU.REGISTER_FILE r) 1))
@@ -320,20 +311,24 @@
 ;; executed. TODO: review setting PC
 (define PC ;; see test-bp.scm for an explanation of the -2
   (let ((addr #x0f94))
-    (getter-with-setter
-     (lambda ()  (- (LDS addr   2) 2))
-     (lambda (v) (STS addr (+ v 2) 2)))))
+    (register 'PC addr
+              (lambda (r) (- (LDS addr 2) 2))
+              (lambda (r v) (STS addr (+ v 2) 2))
+              (lambda (r port)
+                (let ((value ((reg-getter r) r)))
+                  (display "≡" port)
+                  (display (string-pad (number->string value 16) 4 #\0) port))))))
 
 ;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems
 (define SP
-  (getter-with-setter
-   (lambda ()  (bytes->u16le (memory-read* CPU.SP 2)))
-   (lambda (v) (memory-write* CPU.SP (u16le->bytes v) 1))))
-
-(define SREG  (make-register #x3f00 1))
-
-(define (regs)
-  (memory-read* CPU.REGISTER_FILE 32))
+  (let ((addr #x003d))
+    (register 'SP addr
+              (lambda (r)   (bytes->u16le (memory-read* addr 2)))
+              (lambda (r v) (memory-write* addr (u16le->bytes v) 1))
+              (lambda (r port)
+                (let ((value ((reg-getter r) r)))
+                  (display "≡" port)
+                  (display (string-pad (number->string value 16) 4 #\0) port))))))
 
 (define BP
   (getter-with-setter
@@ -359,9 +354,3 @@
 ;;    <property name="SIGNATURE1" value="0x92"/>
 ;;    <property name="SIGNATURE2" value="0x23"/>
 ;; </property-group>
-
-(define VREF.CTRLA (make-register (+ #x00A0 #x00) 1))
-(define PORTA.DIR  (make-register (+ #x0400 #x00) 1))
-(define PORTA.OUT  (make-register (+ #x0400 #x04) 1))
-(define DAC.CTRLA  (make-register (+ #x0680 #x00) 1))
-(define DAC.DATA   (make-register (+ #x0680 #x01) 1))
