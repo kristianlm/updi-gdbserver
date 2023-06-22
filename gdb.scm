@@ -131,10 +131,19 @@
       (for-each (lambda (c) (display (pad-left (number->string (char->integer c) 16) 2 #\0)))
                 (string->list s)))))
 
+;; generic "bytes to value (le)".
+;; (->value "2") => 2
+;; (->value "0100") => #x0001
+(define (->value str)
+  (if (= 1 (number-of-bytes str))
+      (string->number str 16)
+      (bytes->le (hex->string str))))
+
 ;; (cmd-args "m8000fe,2" ",") => (8388862 2)
 ;; (cmd-args "P4=64" "=")     => (4 100)
+;; (cmd-args "P21=0100" "=")  => (4 100)
 (define (cmd-args cmd separator)
-  (map (cut string->number <> 16)
+  (map ->value
        (irregex-split (if (string? separator) `(,separator) separator)
                       (substring cmd 1))))
 
@@ -200,7 +209,9 @@
     (cache-flush!)
     (apply
      (lambda (R value)
-       (set! (r R) value)
+       (cond ((= R #x22) (set! (PC) value))
+             ((= R #x21) (set! (SP) value))
+             (else (set! (r R) value)))
        (rsp-write "OK" op))
      (cmd-args cmd "=")))
 

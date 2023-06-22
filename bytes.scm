@@ -43,3 +43,14 @@
 (define (u16le->bytes value)
   (->bytes (bitwise-and (arithmetic-shift value  0) #xff)
            (bitwise-and (arithmetic-shift value -8) #xff)))
+
+(define (bytes->le bytes)
+  (let loop ((n (max 0 (- (number-of-bytes bytes) 1)))
+             (result 0))
+    (if (>= n 0)
+        (loop (- n 1)
+              (+ (arithmetic-shift result 8)
+                 (char->integer (string-ref bytes n))))
+        result)))
+
+(unless (= #x030201 (bytes->le "\x01\x02\x03")) (error "internal test failure"))
