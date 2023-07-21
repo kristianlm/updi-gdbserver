@@ -61,13 +61,15 @@
 ;; this is where the magic happens:
 (set! (record-printer reg)
       (lambda (r port)
-        (display "#<register " port)
-        (display (reg-name r) port)
+        (display "#<register" port)
         (display " #x" port)
         (display (string-pad (number->string (reg-address r) 16) 4 #\0) port)
+        (display " " port)
         (when (current-updi-fd)
-          (display " " port)
-          ((reg-printer r) r port))
+          (display "\x1b[35m" port)
+          ((reg-printer r) r port)
+          (display "\x1b[0m " port))
+        (display (reg-name r) port)
         (display ">" port)))
 
 ;; TODO: review if "reg" is the best term. something that says

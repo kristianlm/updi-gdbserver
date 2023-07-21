@@ -120,7 +120,7 @@
   (let* ((cs* (number->string (string-checksum pkg) 16))
          (cs  (pad-left cs* 2 #\0))
          (frame (conc "$" pkg "#" cs)))
-    (file-write 1 (conc "« \x1b[30m " (wrt frame) "\x1b[0m\n"))
+    (file-write 1 (conc "« \x1b[31m " (wrt frame) "\x1b[0m\n"))
     (display frame op)
     (flush-output op)))
 
