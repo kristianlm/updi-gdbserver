@@ -36,8 +36,8 @@ unusual build steps. Try this:
 
 ** Running ~avr-gdb~
 
-With ~./gdbserver~ running, if the stars are aligned, you might be
-able to do something this:
+With ~./gdbserver~ running and the stars aligned, you might be able to
+do something this:
 
 #+begin_src C
   > avr-gcc -DF_CPU=1000000 -Os -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
@@ -123,5 +123,9 @@ important ones:
 - Integrate with chicken-debugwire? If the API can be generalized.
 
 - EEPROM support?
+
+- Monitor for wdt reset and inform gdb (SIGILL?)
+
+- fix: PORTB is gone!
 
 - Many, many more.
