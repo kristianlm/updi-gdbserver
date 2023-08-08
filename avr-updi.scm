@@ -322,11 +322,11 @@
                   (display "≡" port)
                   (display (string-pad (number->string value 16) 4 #\0) port))))))
 
-;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems
+;; reading SP as a word (LDS CPU.SP 2) is not supported by target, it seems.
 (define SP
   (let ((addr #x003d))
     (register 'SP addr
-              (lambda (r)   (bytes->u16le (memory-read* addr 2)))
+              (lambda (r) (bytes->u16le (memory-read* addr 2)))
               (lambda (r v) (memory-write* addr (u16le->bytes v) 1))
               (lambda (r port)
                 (let ((value ((reg-getter r) r)))
