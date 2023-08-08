@@ -17,7 +17,12 @@
     updi?
     (fd updi-fd updi-fd-set!))
 
-(define current-updi (make-parameter #f))
+(define current-updi
+  (let ((*fd* #f))
+    (case-lambda
+     (() *fd*)
+     ((fd) (set! *fd* fd) *fd*))))
+
 (define (current-updi-fd) (updi-fd (current-updi)))
 
 ;; (define updi-baudrate
