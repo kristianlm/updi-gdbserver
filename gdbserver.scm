@@ -3,66 +3,85 @@
 (include "avr-updi.scm")
 (include "gdb.scm")
 
+(define config/tty            #f)
+(define config/baud           #f)
+(define config/gdbserver-port 4444)
+(define config/nrepl-port     #f)
+
 (define (usage)
   (with-output-to-port (current-error-port)
     (lambda ()
-      (print "usage: updi-gdbserver <tty> -b <baud>"))))
+      (print "usage: updi-gdbserver [options] <tty> -b <baud>")
+      (print " -b <baud>               Set baudrate of UPDI serial port (required)")
+      (print " -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)")
+      (print " -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)"))))
 
-(let ((cla (command-line-arguments)))
-  (if (and (= 3 (length cla))
-           (equal? "-b" (cadr cla)))
-      (let ((tty (car cla))
-            (baud (string->number (caddr cla))))
-        (updi-open tty baud))
-      (begin
-        (usage)
-        (exit 0))))
+(let loop ((cla (command-line-arguments)))
 
-(print "gdbserver on port 4444")
+  (define (numeric-option)
+    (if (pair? (cdr cla))
+        (or (string->number (cadr cla))
+            (error "non-numeric argument for " (car cla) (cadr cla)))
+        (error "missing argument for " (car cla))))
 
-(define socket-listen (tcp-listen 4444))
-(begin
-  (handle-exceptions
-   e (begin)
-   (thread-state thread)
-   (thread-terminate! thread))
-  (define thread
-    (thread-start!
-     (lambda ()
-       (let loop ()
-         (receive (ip op) (tcp-accept socket-listen)
-           (updi-break)
-           (stop!) ;; gdb connecting - we _have_ to halt ('?')
-           (let loop ()
-             (let ((cmd (rsp-read ip)))
-               (unless (eof-object? cmd)
-                 (handle-exceptions
-                  e (begin
-                      (print-error-message e)
-                      ;; TODO: skip is already replied to packet
-                      (rsp-write "E01" op))
-                  (rsp-handle cmd ip op))
-                 (loop)))))
-         (loop))))))
+  (when (pair? cla)
+    (cond ((equal? (car cla) "-b") (set! config/baud           (numeric-option)) (loop (cddr cla)))
+          ((equal? (car cla) "-p") (set! config/gdbserver-port (numeric-option)) (loop (cddr cla)))
+          ((equal? (car cla) "-r") (set! config/nrepl-port     (numeric-option)) (loop (cddr cla)))
+          (else (set! config/tty (car cla))
+                (loop (cdr cla))))))
 
-;; csi's read (on stdin input) makes the above thread hang
-;; periodically. tcp ports don't do that, so I like to access the
-;; Chicken repl from nrepl instead of doing (repl).
-(eval `(import chicken.file.posix chicken.string srfi-18
-               chicken.memory.representation
-               chicken.bitwise
-               (only chicken.port with-output-to-string)
+(unless config/tty
+  (print "errro: no serial port set <tty>")
+  (usage)
+  (exit 1))
+(unless config/baud
+  (print "errro: no baudrate set -b <baud>")
+  (usage)
+  (exit 2))
 
-               chicken.tcp chicken.io srfi-18
-               chicken.string
-               chicken.irregex
-               chicken.port
-               chicken.bitwise
-               chicken.file.posix))
+(updi-open config/tty config/baud)
 
-(import nrepl)
-(print "nrepl on port 1234")
-(print "try:")
-(print " > avr-gdb -ex \"target extended-remote 127.0.0.1:4444\" program.elf # for gdb")
-(print " > rlwrap nc 127.0.0.1:1234 # for Scheme repl")
-(nrepl 1234)
+(when config/nrepl-port
+  (eval `(import chicken.file.posix chicken.string srfi-18
+                 chicken.memory.representation
+                 chicken.bitwise
+                 (only chicken.port with-output-to-string)
+
+                 chicken.tcp chicken.io srfi-18
+                 chicken.string
+                 chicken.irregex
+                 chicken.port
+                 chicken.bitwise
+                 chicken.file.posix))
+  (import nrepl)
+  (print)
+  (print "Starting repl on port " config/nrepl-port)
+  (print "Connect with, for example:")
+  (print "  rlwrap nc 127.0.0.1:" config/nrepl-port)
+  (print)
+  (thread-start! (lambda () (nrepl config/nrepl-port))))
+
+(define socket-listen (tcp-listen config/gdbserver-port))
+
+(print "Starting gdbserver on port " config/gdbserver-port ". Press ctrl-c to quit.")
+(print "Connect with, for example:")
+(print "  avr-gdb -ex "
+       "\"target extended-remote 127.0.0.1:" config/gdbserver-port "\""
+       " program.elf")
+
+(let loop ()
+  (receive (ip op) (tcp-accept socket-listen)
+    (updi-break)
+    (stop!) ;; gdb connecting - we _have_ to halt ('?')
+    (let loop ()
+      (let ((cmd (rsp-read ip)))
+        (unless (eof-object? cmd)
+          (handle-exceptions
+           e (begin
+               (print-error-message e)
+               ;; TODO: skip is already replied to packet
+               (rsp-write "E01" op))
+           (rsp-handle cmd ip op))
+          (loop)))))
+  (loop))
