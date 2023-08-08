@@ -148,7 +148,19 @@
     (else (error "unsupported len for REPEAT (≠ 1)" len))))
 
 (define (KEY key) (updi-cmd (conc "\x55\xe0" key) 0) (begin))
-(define (SIB)     (updi-cmd (conc "\x55\xe6") 32))
+
+;; The SIB is ascii but has a structure. See (32.3.7 System
+;; Information Block). My ATtiny414 looks like this:
+;;
+;; ,------- family
+;; ||||||| ,- reserved
+;; ||||||| | ,--- NVM ver
+;; ||||||| | ||| ,--- OCD ver
+;; ||||||| | ||| ||| ,- reserved
+;; ||||||| | ||| ||| | ,- DBG_OSC_FREQ
+;; 0123456 7 89a bcd e f  ,,,,,,,,,,,,,,,,,,, unofficial
+;; tinyAVR   P:0 D:0 - 3  M2 (01.59B14.0)\x00
+(define (SIB)     (updi-cmd (conc "\x55\xe6") 32)) ;; unofficial 32-bit readout
 
 (define (memory-read* address len)
   (unless (<=  len #xff) (error "len must be ≤ #xFF" len))
