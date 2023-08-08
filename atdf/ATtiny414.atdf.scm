@@ -289,7 +289,7 @@
 (define ADC0.CALIB           (register 'ADC0.CALIB          #x0616))
 (define ADC0.WINHT           (register 'ADC0.WINHT          #x0614))
 (define ADC0.WINLT           (register 'ADC0.WINLT          #x0612))
-(define ADC0.RES             (register 'ADC0.RES            #x0610))
+(define ADC0.RES             (register 'ADC0.RES            #x0610 reg-default-getter/u16 reg-default-setter/u16 reg-default-printer/u16))
 (define ADC0.TEMP            (register 'ADC0.TEMP           #x060d))
 (define ADC0.DBGCTRL         (register 'ADC0.DBGCTRL        #x060c))
 (define ADC0.INTFLAGS        (register 'ADC0.INTFLAGS       #x060b))

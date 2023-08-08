@@ -40,8 +40,13 @@
     (setter  reg-setter  reg-setter-set!)
     (printer reg-printer reg-printer-set!))
 
-(define (reg-default-getter r)   (LDS (reg-address r)   1))
-(define (reg-default-setter r v) (STS (reg-address r) v 1))
+(define (reg-default-getter/u8  r) (LDS (reg-address r) 1))
+(define (reg-default-getter/u16 r) ;; LDS len 2 sometimes bad
+  (bytes->u16le (memory-read* (reg-address r) 2)))
+
+(define (reg-default-setter/u8  r v) (STS (reg-address r) v 1))
+(define (reg-default-setter/u16 r v)
+  (memory-write* (reg-address r) (u16le->bytes v) 1))
 
 (begin
  (define (make-value-pretty-printer len)
@@ -75,8 +80,8 @@
 ;; TODO: review if "reg" is the best term. something that says
 ;; "anything in the data address space"
 (define (register name address #!optional
-                  (getter reg-default-getter)
-                  (setter reg-default-setter)
+                  (getter reg-default-getter/u8)
+                  (setter reg-default-setter/u8)
                   (printer (lambda (r p) (reg-default-printer/u8 r p))))
   (%make-reg name address getter setter printer))
 
