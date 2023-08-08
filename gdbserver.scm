@@ -7,6 +7,7 @@
 (define config/baud           #f)
 (define config/gdbserver-port 4444)
 (define config/nrepl-port     #f)
+(define config/greeting       #t)
 
 (define (usage)
   (with-output-to-port (current-error-port)
@@ -14,7 +15,8 @@
       (print "usage: updi-gdbserver [options] <tty> -b <baud>")
       (print " -b <baud>               Set baudrate of UPDI serial port (required)")
       (print " -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)")
-      (print " -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)"))))
+      (print " -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)")
+      (print " -g                      Disable initial (SIB) greeting"))))
 
 (let loop ((cla (command-line-arguments)))
 
@@ -28,6 +30,7 @@
     (cond ((equal? (car cla) "-b") (set! config/baud           (numeric-option)) (loop (cddr cla)))
           ((equal? (car cla) "-p") (set! config/gdbserver-port (numeric-option)) (loop (cddr cla)))
           ((equal? (car cla) "-r") (set! config/nrepl-port     (numeric-option)) (loop (cddr cla)))
+          ((equal? (car cla) "-g") (set! config/greeting                     #f) (loop (cdr cla)))
           (else (set! config/tty (car cla))
                 (loop (cdr cla))))))
 
@@ -69,6 +72,10 @@
 (print "  avr-gdb -ex "
        "\"target extended-remote 127.0.0.1:" config/gdbserver-port "\""
        " program.elf")
+
+(when config/greeting
+  (print)
+  (print "Current device SIB:\n  " (SIB)))
 
 (let loop ()
   (receive (ip op) (tcp-accept socket-listen)
