@@ -77,8 +77,11 @@
        " program.elf")
 
 (when config/greeting
+  (updi-break)
   (print)
-  (print "Current device SIB:\n  " (SIB)))
+  (display "Current device SIB:\n  ")
+  (write (SIB))
+  (newline))
 
 (let loop ()
   (receive (ip op) (tcp-accept socket-listen)
