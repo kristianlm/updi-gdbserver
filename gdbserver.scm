@@ -20,19 +20,22 @@
 
 (let loop ((cla (command-line-arguments)))
 
-  (define (numeric-option)
+  (define (== s) (equal? (car cla) s))
+
+  (define (n) ;; numeric option
     (if (pair? (cdr cla))
         (or (string->number (cadr cla))
             (error "non-numeric argument for " (car cla) (cadr cla)))
         (error "missing argument for " (car cla))))
 
   (when (pair? cla)
-    (cond ((equal? (car cla) "-b") (set! config/baud           (numeric-option)) (loop (cddr cla)))
-          ((equal? (car cla) "-p") (set! config/gdbserver-port (numeric-option)) (loop (cddr cla)))
-          ((equal? (car cla) "-r") (set! config/nrepl-port     (numeric-option)) (loop (cddr cla)))
-          ((equal? (car cla) "-g") (set! config/greeting                     #f) (loop (cdr cla)))
-          (else (set! config/tty (car cla))
-                (loop (cdr cla))))))
+    (cond
+     ((== "-b") (set! config/baud           (n)) (loop (cddr cla)))
+     ((== "-p") (set! config/gdbserver-port (n)) (loop (cddr cla)))
+     ((== "-r") (set! config/nrepl-port     (n)) (loop (cddr cla)))
+     ((== "-g") (set! config/greeting        #f) (loop (cdr  cla)))
+     (else (set! config/tty (car cla))
+           (loop (cdr cla))))))
 
 (unless config/tty
   (print "errro: no serial port set <tty>")
