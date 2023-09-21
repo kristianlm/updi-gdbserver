@@ -390,7 +390,7 @@
            (rsp-write "OK" op))))
 
    ;; empty packet reply for unknown commands (of which there are
-   ;; _a lot_.
+   ;; _a lot_).
    (else (rsp-write "" op))))
 
 ;; (rsp-handle "M0,2:00ff" (current-output-port))
