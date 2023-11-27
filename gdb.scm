@@ -10,7 +10,7 @@
 (define (string-prefix? s prefix) (substring=? s prefix 0 0 (string-length prefix)))
 
 ;; gdb-addressing (flash starting at 0x00)
-(define cache (make-memory-cache #x1000)) ;; <-- TODO actual target size
+(define cache (make-memory-cache #x20000)) ;; <-- TODO actual target size
 
 (define (bytes-for-each/i s proc)
   (let loop ((n 0))
