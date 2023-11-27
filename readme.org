@@ -31,7 +31,12 @@ unusual build steps. Try this:
   > git clone https://github.com/kristianlm/updi-gdbserver
   > cd updi-gdbserver
   > csc -O1 gdbserver.scm
-  > # TODO: chicken-install -s -test && gdbserver instead
+  > ./gdbserver -b 10000 /dev/ttyUSB1                                                                        1s
+Starting gdbserver on port 4444. Press ctrl-c to quit.
+Connect with, for example:
+  avr-gdb -ex "target extended-remote 127.0.0.1:4444" program.elf
+
+Current device SIB: "AVR     P:2D:1-3M2 (A5.KV00D.0)\x00"
 #+end_src
 
 ** Running ~avr-gdb~
