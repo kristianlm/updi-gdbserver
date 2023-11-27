@@ -2,24 +2,11 @@
 * AVR UPDI library and cli tool
 
 
-Only the ATTiny414 is currently supported.
+> Only the ATTiny414 has been tested. Other devices may work.
 
-Use [[https://sourceware.org/gdb/][avr-gdb]] to debug your AVR programs. Follow the ordinary pymcuprog
-guidance for how to get the serial port set up to talk
-UPDI. [[https://github.com/SpenceKonde/AVR-Guidance/blob/master/UPDI/jtag2updi.md][AVR-Guidance]] has a nice ascii diagram:
-
-#+begin_src
---------------------                                   To Target device
-                DTR|    470Ω    BAT43                 __________________
-                Rx |---------------------,-----------| UPDI
-                Tx |----/\/\-----|<|----'       ,----| Gnd
-                Vcc|---------------------------/-----| Vcc
-                CTS|                          /      |__________________
-                Gnd|-------------------------'
------------
-#+end_src
-
-You can also see [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][Serial port UPDI]] or for details.
+~updi-gdbserver~ bridges [[https://sourceware.org/gdb/][avr-gdb]] and
+you favorite UPDI-enabled AVR microcontroller. It can be used to debug
+(stop, inspect, modify) and program your target.
 
 ** Building
 
@@ -31,47 +18,104 @@ unusual build steps. Try this:
   > git clone https://github.com/kristianlm/updi-gdbserver
   > cd updi-gdbserver
   > csc -O1 gdbserver.scm
-  > ./gdbserver -b 10000 /dev/ttyUSB1                                                                        1s
-Starting gdbserver on port 4444. Press ctrl-c to quit.
-Connect with, for example:
-  avr-gdb -ex "target extended-remote 127.0.0.1:4444" program.elf
-
-Current device SIB: "AVR     P:2D:1-3M2 (A5.KV00D.0)\x00"
+> ./gdbserver -h
+errro: no baudrate set -b <baud>
+usage: updi-gdbserver [options] <tty> -b <baud>
+ -b <baud>               Set baudrate of UPDI serial port (required)
+ -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)
+ -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)
+ -g                      Disable initial (SIB) greeting
 #+end_src
 
-** Running ~avr-gdb~
+** Getting started
+
+*** Hardware setup
+
+Follow the ordinary
+[[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][pymcuprog]]
+guidance for how to get the serial port set up to talk UPDI.
+
+Since the UPDI interface resembles debugWIRE (see below), you can also
+give [[https://github.com/dcwbrown/dwire-debug][dwire-debug]] a read
+for more details and for some UART adapter recommendations.
+
+For the devices that have a separate UPDI-pin, this should be all
+that's required to use UPDI. Some devices share the UPDI pin and need
+a special high-voltage sequence to enable UPDI on the target. This
+project does not support that. Luckily, UPDI has been enabled by
+default on all devices tested so far. So if you're willing to
+sacrifice a pin dedicated to UPDI, this simple UART-based debugging
+experience may be for you.
+
+*** Building target example
+
+If you're lucky enough to have a version of ~avr-gcc~ above 12.0 or
+13.0 (and recent accompanying ~avr-libc~), the newer UPDI-enabled AVR
+devices are supported out of the box:
+
+#+begin_src bash
+  > avr-gcc -DF_CPU=1000000 -Os -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
+#+end_src
+
+Older ~avr-gcc~ versions can still target the newer UPDI-enabled
+devices, but you'll need to provide appropriate headers and
+libraries. https://start.atmel.com/ may be able to provide you with a
+project template.
+
+Since ~updi-gdbserver~ supports writing to the target flash and
+~avr-gdb~ supports extracting the program section of elf-files,
+"programming" your target can be done with the ~load~ command from
+~avr-gdb~.
+
+*** Running ~gdbserver~
+
+#+begin_src bash
+  > ./gdbserver -b 10000 /dev/ttyUSB1                                                                        1s
+  Starting gdbserver on port 4444. Press ctrl-c to quit.
+  Connect with, for example:
+  avr-gdb -ex "target extended-remote 127.0.0.1:4444" program.elf
+#+end_src
+
+*** Running ~avr-gdb~
 
 With ~./gdbserver~ running and the stars aligned, you might be able to
 do something this:
 
-#+begin_src C
-  > avr-gcc -DF_CPU=1000000 -Os -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
-  > avr-gdb --eval-command "target remote 127.0.0.1:4444" --eval-command "load" example-led-blink.elf
+#+begin_src sh
+  > avr-gdb --eval-command "target remote 127.0.0.1:4444" example-led-blink.elf
   GNU gdb (GDB) 12.1
   …
-  Reading symbols from example-led-blink.elf...
-  Remote debugging using 127.0.0.1:4444
-  0x00000000 in __vectors ()
-  Loading section .text, size 0x7e lma 0x0
-  Start address 0x00000000, load size 126
-  Transfer rate: 88 bytes/sec, 42 bytes/write.
-  (gdb) print $pc
-  $1 = (void (*)()) 0x0 <__vectors>
-  (gdb) monitor (reset!)
-  #<unspecified>
+  # program target flash:
+  (gdb) load
+  Loading section .text, size 0xd4 lma 0x0
+  Start address 0x00000000, load size 212
+  Transfer rate: 237 bytes/sec, 42 bytes/write.
+
+  (gdb) info b
+  No breakpoints or watchpoints.
+
+  (gdb) c
+  Continuing.
+
+  # wait a bit and hit C-c
+  ^C
+  Program received signal SIGINT, Interrupt.
+  0x000000c8 in _delay_ms (__ms=100) at /home/klm/x/avr//avr/include/util/delay.h:187
+  187		__builtin_avr_delay_cycles(__ticks_dc);
+
+  # updi-gdbserver supports 1 hardware breakpoints, which doesn't require
+  # rewriting flash the way software breakpoints do.
   (gdb) hbreak example-led-blink.c:7
   Hardware assisted breakpoint 1 at 0x4c: file example-led-blink.c, line 7.
-  (gdb) i br
+
+  (gdb) info br
   Num     Type           Disp Enb Address    What
   1       hw breakpoint  keep y   0x0000004c in main at example-led-blink.c:7
-  (gdb) c
-  Continuing.
 
-  Breakpoint 1, main () at example-led-blink.c:7
-  7	    PORTA.OUT |=  (1 << PIN6_bp); _delay_ms(100);
   (gdb) c
-  Continuing.
+  Continuing  .
 
+  # after a brief moment, gdb should reply as the target hits our breakpoint
   Breakpoint 1, main () at example-led-blink.c:7
   7	    PORTA.OUT |=  (1 << PIN6_bp); _delay_ms(100);
 #+end_src
@@ -84,15 +128,18 @@ environment before I start writing any code meant to run on the
 target. Below is an example of using the DAC peripheral while the
 target CPU is stopped.
 
+This is highly experimental and subject to change.
+
 #+begin_src scheme
   me@workstation> rlwrap nc localhost 1234
   ;; nrepl on (./gdbserver)
   #> (updi-break)
   #> (stop!)
-  #> (set! (VREF.CTRLA) 1) ;; 1.1V
-  #> (set! (DAC.CTRLA)  #b01000001) ;; OUTEN, ENABLE
-  #> (set! (PORTA.OUT)  #b01000000) ;; PA6 output
-  #> (define (dac n) (set! (DAC.DATA) n))
+  #> (include "atdf/ATtiny414.atdf.scm")
+  #> (set VREF.CTRLA 1) ;; 1.1V
+  #> (set DAC0.CTRLA  #b01000001) ;; OUTEN, ENABLE
+  #> (set PORTA.OUT  #b01000000) ;; PA6 output
+  #> (define (dac n) (set DAC0.DATA n))
   #> (begin (dac #x80) (dac #xff) (dac #x80) (dac #x00))
 #+end_src
 
@@ -105,16 +152,26 @@ communication is shown in blue. The delays between the ~dac~ calls are
 caused by UART communication. This could probably be improved by
 investigating at guard time and UPDI clock speed.
 
+** Comparison to debugWIRE
+
+debugWIRE is an older protocol for debugging AVR devices. It's on the
+very popular ~attiny85~, for example. It has a lot in common with
+UPDI, particularly in that it's a 1-wire, half-duplex, UART-based
+interface that can be used to debug AVR chips with just a UART
+adapter.
+
+One major advantage of UPDI versus debug-wire is that the UPDI UART
+baud rate is independent of target CPU speed. The target UPDI module
+will detect the host UPDI baudrate using the ~0x55~ mark, and reply
+with the same baudrate. This, for example, makes it possible to change
+the target CPU clockspeed during a debugging session.
+
 ** TODOs
 
 Too many to mention here, the source contains a lot of them. But a few
 important ones:
 
 - Support multiple hardware breakpoints
-
-- Comunnicate memory regions to GDB somehow. Currently, avr-gdb will
-  upload flash content 32B at a time. With a 64B flash pagesize, this
-  wears the flash twice as it needs to.
 
 - Detect target device automatically (based on the 24-bit signature)
 
