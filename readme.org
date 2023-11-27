@@ -2,7 +2,9 @@
 * AVR UPDI library and cli tool
 
 
-> Only the ATTiny414 has been tested. Other devices may work.
+#+begin_quote
+Only the ATTiny414 has been tested. Other devices may work.
+#+end_quote
 
 ~updi-gdbserver~ bridges [[https://sourceware.org/gdb/][avr-gdb]] and
 you favorite UPDI-enabled AVR microcontroller. It can be used to debug
