@@ -253,6 +253,17 @@
                  (unless (updi-key-chiperase)
                    (error "key chiperase failed"))))))
 
+;; probe for success with exponential backoff.
+(define (retrying n success)
+  (let loop ((n n)
+             (duration 1/10))
+    (or (success)
+        (if (> n 0)
+            (begin (thread-sleep! duration)
+                   (loop (- n 1)
+                         (* duration 2)))
+            #f))))
+
 ;; nvmprog-mode and ocd-mode seem to be mutually exclusive.
 (define (updi-nvmprog!)
   (unless (updi-nvmprog?)
@@ -263,8 +274,9 @@
     ;; how can we get around that when we're in debug mode? simply skipping reset doesn't work
     (set! (resetting) #t)
     (set! (resetting) #f)
-    ;; TODO: retry with timeout here
-    (unless (updi-nvmprog?) (error "could not put target in nvmprog mode"))))
+
+    (unless (retrying 4 (complement updi-nvmprog?))
+      (error "could not put target in nvmprog mode"))))
 
 (define (updi-chip-erase!)
   (set! (updi-key-chiperase) #t)
@@ -272,8 +284,8 @@
   (set! (resetting) #f)
 
   ;; TODO retry with timeout here
-  (if (updi-lockstatus?)
-      (error "could not chip-erase (lockstatus still set)")))
+  (unless (retrying 4 (complement updi-lockstatus?))
+    (error "could not chip-erase (lockstatus still set)")))
 
 
 ;; ======================================== "popular" target commands
