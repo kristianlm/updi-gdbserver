@@ -32,7 +32,7 @@
 
 ;; (updi-open "/dev/ttyUSB1" 100000)
 (define (updi-open tty baudrate)
-  (let ((fd (file-open tty open/rdwr)))
+  (let ((fd (file-open tty (+ open/noctty open/rdwr))))
     (tty-setup fd baudrate)
     (current-updi (%make-updi fd))
     (current-updi)))

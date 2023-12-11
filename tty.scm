@@ -14,7 +14,7 @@
     }
 
     config.c_iflag     = 0;
-    config.c_cflag     = CS8 | CSTOPB | PARENB | BOTHER | CLOCAL;
+    config.c_cflag     = CS8 | CSTOPB | PARENB | BOTHER | CLOCAL | CREAD;
     config.c_oflag     = 0;
     config.c_lflag     = 0;
     config.c_ispeed    = baud;
