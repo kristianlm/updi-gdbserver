@@ -37,6 +37,12 @@ Follow the ordinary
 [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][pymcuprog]]
 guidance for how to get the serial port set up to talk UPDI.
 
+#+begin_quote
+`updi-gdbserver` does not currently seem to work with a resistor
+across TX and RX pins. Please use a diode, as described [[https://github.com/dcwbrown/dwire-debug#ft232rch340-usb-uart-hardware][here]], until
+this is fixed.
+#+end_quote
+
 Since the UPDI interface resembles debugWIRE (see below), you can also
 give [[https://github.com/dcwbrown/dwire-debug][dwire-debug]] a read
 for more details and for some UART adapter recommendations.
