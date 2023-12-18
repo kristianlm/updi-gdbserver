@@ -32,9 +32,10 @@
 
 (define (tty-break fd µs)
   ((foreign-lambda* void ((int fd) (int us)) "
-  ioctl(fd, TIOCSBRK, 0);
-  usleep(us);
-  ioctl(fd, TIOCCBRK, 0);")
+  ioctl(fd, TIOCSBRK, 0); usleep(us); ioctl(fd, TIOCCBRK, 0);
+  usleep(1000 * 100);
+  ioctl(fd, TIOCSBRK, 0); usleep(us); ioctl(fd, TIOCCBRK, 0);
+")
    fd µs))
 
 (define (tty-break-set! fd)

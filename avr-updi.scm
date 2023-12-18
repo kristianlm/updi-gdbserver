@@ -60,7 +60,16 @@
               (loop (- len reply#) (cons reply result))))
         (reverse-string-append result))))
 
-(define (updi-break #!optional (ms 25000)) (tty-break (current-updi-fd) ms))
+(define (updi-drain! #!optional (fd (current-updi-fd)))
+  (let loop ()
+    (when (tty-data-available? fd)
+      (file-read-retrying fd 1)
+      (loop))))
+
+(define (updi-break #!optional (ms 25000))
+  (updi-drain!)
+  (tty-break (current-updi-fd) ms)
+  (updi-drain!))
 
 ;; send `data` and consume its echo (since TX is physically connected
 ;; to RX).
