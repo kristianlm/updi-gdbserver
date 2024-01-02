@@ -40,8 +40,12 @@
 ;; ======================================== UPDI<-->UART interface
 
 (define (tty-data-available? fd)
- (receive (rs ws) (file-select (list fd) (list) 0)
-   (if (pair? rs) #t #f)))
+  (receive (rs ws) (file-select (list fd) (list) 1) ;; <-- TODO: make timeout 250ms
+    (if (pair? rs)
+        (if (equal? (car rs) fd)
+            #t
+            (error "unexpected read fd ≠ " (car rs) fd))
+        #f)))
 
 ;; handle partial reads produced by file-read.
 ;;
