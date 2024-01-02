@@ -8,6 +8,7 @@
 (define config/gdbserver-port 4444)
 (define config/nrepl-port     #f)
 (define config/greeting       #t)
+(define config/verbose        #f)
 
 (define (usage)
   (with-output-to-port (current-error-port)
@@ -16,6 +17,7 @@
       (print " -b <baud>               Set baudrate of UPDI serial port (required)")
       (print " -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)")
       (print " -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)")
+      (print " -v                      Verbose logs to stderr")
       (print " -g                      Disable initial (SIB) greeting"))))
 
 (let loop ((cla (command-line-arguments)))
@@ -33,9 +35,12 @@
      ((== "-b") (set! config/baud           (n)) (loop (cddr cla)))
      ((== "-p") (set! config/gdbserver-port (n)) (loop (cddr cla)))
      ((== "-r") (set! config/nrepl-port     (n)) (loop (cddr cla)))
+     ((== "-v") (set! config/verbose         #t) (loop (cdr  cla)))
      ((== "-g") (set! config/greeting        #f) (loop (cdr  cla)))
      (else (set! config/tty (car cla))
            (loop (cdr cla))))))
+
+(verbose? config/verbose)
 
 (unless config/tty
   (print "errro: no serial port set <tty>")
@@ -78,11 +83,11 @@
        " program.elf")
 
 (when config/greeting
-  (updi-break)
-  (print)
-  (display "Current device SIB:\n  ")
-  (write (SIB))
-  (newline))
+  (let ((sib (SIB)))
+    (print "Current device SIB:")
+    (display "  ")
+    (write sib)
+    (newline)))
 
 (let loop ()
   (receive (ip op) (tcp-accept socket-listen)

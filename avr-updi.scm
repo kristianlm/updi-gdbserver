@@ -1,7 +1,15 @@
 (import chicken.file.posix chicken.string srfi-18
         chicken.memory.representation
-        chicken.bitwise
+        chicken.bitwise chicken.blob
         (only chicken.port with-output-to-string))
+
+;; ======================================== logging
+
+(define verbose? (make-parameter #f))
+(define (prnt . args)
+  (when (verbose?)
+    (with-output-to-port (current-error-port)
+      (lambda () (apply print args)))))
 
 ;; ======================================== basic helpers
 
@@ -65,7 +73,9 @@
           (if (= 0 reply#)
               ((timeout-procedure) fd 1)
               (loop (- len reply#) (cons reply result))))
-        (reverse-string-append result))))
+        (let ((final (reverse-string-append result)))
+          (prnt "  read: " (string->blob final))
+          final))))
 
 (define (updi-drain! wait #!optional (fd (current-updi-fd)))
   ;; flush unexpected data
@@ -75,7 +85,9 @@
       (file-read-retrying fd 1)
       (loop))))
 
-(define (updi-break #!optional (ms 25000)) (tty-break (current-updi-fd) ms))
+(define (updi-break #!optional (µs 25000))
+  (prnt "updi-break: " µs "µs")
+  (tty-break (current-updi-fd) µs))
 
 (define (updi-init)
   (updi-break)
@@ -120,8 +132,11 @@
 (define (updi-cmd data response-len #!optional (fd (current-updi-fd)))
 
   (updi-drain! 0)
+  (prnt "updi-cmd " (number-of-bytes data) " + " response-len)
 
+  (prnt " write: " (string->blob data))
   (file-write fd data)
+
   (let ((echo (file-read-retrying fd (number-of-bytes data))))
     (unless (equal? echo data)
       (error (conc "bad echo: expecting " (wrt data) " but got " (wrt echo))))
