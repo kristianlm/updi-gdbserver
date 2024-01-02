@@ -47,6 +47,7 @@
   (exit 2))
 
 (updi-open config/tty config/baud)
+(updi-init)
 
 (when config/nrepl-port
   (eval `(import chicken.file.posix chicken.string srfi-18
