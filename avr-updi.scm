@@ -38,7 +38,7 @@
 ;;    (lambda ()     (error "TODO"))
 ;;    (lambda (baud) (tty-setup (current-updi-fd) baud))))
 
-;; (updi-open "/dev/ttyUSB1" 100000)
+;; (updi-open "/dev/ttyUSB1" 115200)
 (define (updi-open tty baudrate)
   (let ((fd (file-open tty open/rdwr)))
     (tty-setup fd baudrate)

@@ -56,10 +56,10 @@
     (read-char ip)))
 
 ;; TODO: escape these binary characters
-(eq? c #\#)
-(eq? c #\$)
-(eq? c #\})
-(eq? c #\*)
+;; (eq? c #\#)
+;; (eq? c #\$)
+;; (eq? c #\})
+;; (eq? c #\*)
 
 (define (rsp-expect ip expected)
   (let ((actual (read-char* ip)))

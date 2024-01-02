@@ -1,5 +1,7 @@
 (import (only chicken.condition print-error-message)
-         chicken.process-context chicken.port)
+        chicken.foreign
+        (only chicken.condition handle-exceptions)
+        chicken.process-context chicken.port)
 (include "avr-updi.scm")
 (include "gdb.scm")
 
