@@ -3,6 +3,10 @@
 (include "avr-updi.scm")
 (include "gdb.scm")
 
+(foreign-declare "
+#include <termios.h>
+")
+
 (define config/tty            #f)
 (define config/baud           #f)
 (define config/gdbserver-port 4444)
@@ -46,7 +50,7 @@
   (usage)
   (exit 2))
 
-(updi-open config/tty config/baud)
+;; (updi-open config/tty config/baud)
 
 (when config/nrepl-port
   (eval `(import chicken.file.posix chicken.string srfi-18
@@ -75,6 +79,120 @@
 (print "  avr-gdb -ex "
        "\"target extended-remote 127.0.0.1:" config/gdbserver-port "\""
        " program.elf")
+
+(begin
+  ;;(updi-break)
+  (print "using avrdude init sequence (double break)")
+
+  (let ((fd (file-open config/tty (+ open/noctty open/rdwr))))
+    ;; (tty-setup fd baudrate)
+    (current-updi (%make-updi fd)))
+  
+  ((foreign-lambda* int ((int fd) (int baud))
+                    "
+    struct termios termios = {0};
+int rc;
+    if (tcgetattr(fd, &termios) < 0) {
+     fprintf(stderr, \"set-baud!: error in gets2\");
+     C_return(0);
+    }
+
+    termios.c_iflag     = 0;
+    termios.c_cflag     = CS8 | PARENB | CLOCAL | CREAD /*| CSTOPB */ ;
+    termios.c_oflag     = 0;
+    termios.c_lflag     = 0;
+    termios.c_ispeed    = 300;
+    termios.c_ospeed    = 300;
+    termios.c_cc[VMIN]  = 0;
+    termios.c_cc[VTIME] = 10; // read with 1s timeout
+  rc = tcsetattr(fd, TCSANOW, &termios);
+  if (rc < 0) {
+    int ret = -errno;
+    fprintf(stderr, \"tcsetattr() failed\\n\");
+    return ret;
+  }
+//    if (ioctl(fd, TCSETS2, &termios)) {
+//      fprintf(stderr, \"set-baud!: error in sets2\");
+//      C_return(0);
+//    }
+
+
+//    ioctl(fd, TCFLSH, TCIOFLUSH);
+
+    unsigned char reply;
+
+    write(fd, \"\\x00\", 1);
+    read(fd, &reply, 1);
+
+    usleep(100*1000);
+
+    write(fd, \"\\x00\", 1);
+    read(fd, &reply, 1);
+
+    termios.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHOK | ECHONL | ISIG | IEXTEN);
+#ifdef ECHOCTL
+  termios.c_lflag &= ~ECHOCTL;
+#endif /* ECHOCTL */
+#ifdef ECHOKE
+  termios.c_lflag &= ~ECHOKE;
+#endif /* ECHOKE */
+  termios.c_oflag &= ~(OPOST | ONLCR | OCRNL); 
+  termios.c_iflag &= ~(INLCR | IGNCR | ICRNL | IGNBRK);
+#ifdef IUCLC
+  termios.c_iflag &= ~IUCLC;
+#endif /* IUCLC */
+#ifdef PARMRK
+  termios.c_iflag &= ~PARMRK;
+#endif /* PARMRK */
+
+  termios.c_cflag &= ~CSIZE;
+    termios.c_cflag |= CS8;
+
+    termios.c_cflag |= CSTOPB;
+
+  termios.c_iflag &= ~(INPCK | ISTRIP);
+
+    termios.c_cflag |= PARENB;
+
+    termios.c_cflag &= ~PARODD;
+
+
+#ifdef IXANY
+  termios.c_iflag &= ~IXANY;
+#endif /* IXANY */
+  termios.c_iflag &= ~(IXON | IXOFF);
+
+#ifdef CRTSCTS
+  termios.c_iflag &= ~CRTSCTS;
+#endif /* CRTSCTS */
+
+#ifdef CNEW_RTSCTS
+  termios.c_iflag &= ~CNEW_RTSCTS;
+#endif /* CRTSCTS */
+
+
+  rc = tcsetattr(fd, TCSANOW, &termios);
+  if (rc < 0) {
+    int ret = -errno;
+    fprintf(stderr, \"tcsetattr() failed\\n\");
+    return ret;
+  }
+
+  tcflush(fd, TCIFLUSH); //TCFLSH, TCIOFLUSH);
+
+    return(1);
+")
+   (current-updi-fd)
+   config/baud)
+  
+  (print)
+  ;; updi_link_stcs(pgm, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT)
+  (file-write (current-updi-fd) "\x55\xC3\x08") ;; (STCS UPDI.CTRLB #b00001000)
+  (file-write (current-updi-fd) "\x55\xC2\x80") ;; (STCS UPDI.CTRLA #b10000000) 
+  (updi-drain!)
+  (print "link ldcs:")
+  (print (LDCS UPDI.STATUSA))
+  (print "OKEY!"))
 
 (when config/greeting
   (updi-break)

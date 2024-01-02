@@ -40,15 +40,18 @@
 ;; ======================================== UPDI<-->UART interface
 
 (define (tty-data-available? fd)
- (receive (rs ws) (file-select (list fd) (list) 0)
-   (if (pair? rs) #t #f)))
+ (receive (rs ws) (file-select (list fd) (list) 1)
+   (print "READY? " rs ws)
+   (if (and (pair? rs) (equal? (car rs) fd)) #t #f)))
 
 ;; handle partial reads produced by file-read.
 ;;
 ;; timeouts are used to avoid "hangs", waiting for reads that will
 ;; never occur. they should ideally never occur.
+(import chicken.blob)
 (define (file-read-retrying fd len #!key
                             (timeout (lambda (s) (error (conc "updi read timeout (" s "s)")))))
+  (print "READING TTY " len)
   (let loop ((len len)
              (result '())) ;; <-- reversed list of strings
     (if (> len 0)
@@ -58,23 +61,29 @@
           (if (= 0 reply#)
               (timeout 1)
               (loop (- len reply#) (cons reply result))))
-        (reverse-string-append result))))
+        (let ((final (reverse-string-append result)))
+          (print "read: " (string->blob final))
+          final))))
 
 (define (updi-drain! #!optional (fd (current-updi-fd)))
   (let loop ()
     (when (tty-data-available? fd)
-      (file-read-retrying fd 1)
+      (print "DRAIN: " (file-read fd 1))
       (loop))))
 
 (define (updi-break #!optional (ms 25000))
   (updi-drain!)
   (tty-break (current-updi-fd) ms)
   (updi-drain!))
-
+(import chicken.blob)
 ;; send `data` and consume its echo (since TX is physically connected
 ;; to RX).
 (define (updi-cmd data response-len #!optional (fd (current-updi-fd)))
-
+  (display "updi-cmd: ")
+  (write data) (write (string->blob data))
+  (display " ")
+  (write response-len)
+  (newline)
   ;; flush unexpected data
   (let loop ()
     (when (tty-data-available? fd)
@@ -84,7 +93,7 @@
   (file-write fd data)
   (let ((echo (file-read-retrying fd (number-of-bytes data))))
     (unless (equal? echo data)
-      (error (conc "bad echo: expecting " (wrt data) " but got " (wrt echo))))
+      (error (conc "bad echo: expecting " (wrt (string->blob data)) " but got " (wrt (string->blob echo)))))
     (file-read-retrying fd response-len)))
 
 (define (updi-expect-ack)
