@@ -3,49 +3,65 @@
 
 
 #+begin_quote
-Only the ATTiny414 has been tested. Other devices may work.
+This project is in alpha stage. Only a few ATTiny devices have been
+tested, but most UPDI-based devices are expected to work. Please open
+issues if you encounter problems!
 #+end_quote
 
-~updi-gdbserver~ bridges [[https://sourceware.org/gdb/][avr-gdb]] and
-you favorite UPDI-enabled AVR microcontroller. It can be used to debug
-(stop, inspect, modify) and program your target.
+~updi-gdbserver~ bridges [[https://sourceware.org/gdb/][avr-gdb]] and you favorite [[https://en.wikipedia.org/wiki/AVR_microcontrollers#UPDI][UPDI]]-enabled AVR
+microcontroller. It can be used to debug (stop, inspect, modify) and
+program your target.
 
-** Building
+:         avr-gdb
+:      +------------+
+:      |            |
+:      |    TCP     |
+:      +-----+------+
+:            | gdb remote         UART
+:            |   protocol        dongle                 AVR chip
+:      +-----+----------+      +-------+             +-------------+
+:      |    TCP         |      |       |             |             |
+:      |  (listen)      |      |    TX |---1kOhm--+--+ UPDI pin    |
+:      |            tty +------+       |          |  |             |
+:      |                |      |    RX |----------+  |             |
+:      +----------------+      +-------+             +-------------+
+:        updi-gdbserver            |                    |
+:                                 GND                  GND
+
+** Getting started
+
+*** Building
 
 Unfortunately, this tool is written in an exoteric language and has
 unusual build steps. Try this:
 
 #+begin_src bash
   > apt install chicken-bin # or pacman -S chicken or something thereof
+  > chicken-install -s srfi-18 # install dependencies
   > git clone https://github.com/kristianlm/updi-gdbserver
   > cd updi-gdbserver
   > csc -O1 gdbserver.scm
-> ./gdbserver -h
-errro: no baudrate set -b <baud>
-usage: updi-gdbserver [options] <tty> -b <baud>
- -b <baud>               Set baudrate of UPDI serial port (required)
- -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)
- -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)
- -g                      Disable initial (SIB) greeting
+  > ./gdbserver
+  -b <baud>               Set baudrate of UPDI serial port (required)
+  -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)
+  -r <repl-port>          Set TCP listening port for Chicken Scheme repl (defaults to off)
+  -v                      Verbose logs to stderr
+  -g                      Disable initial (SIB) greeting
 #+end_src
-
-** Getting started
 
 *** Hardware setup
 
-Follow the ordinary
-[[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][pymcuprog]]
-guidance for how to get the serial port set up to talk UPDI.
-
-#+begin_quote
-`updi-gdbserver` does not currently seem to work with a resistor
-across TX and RX pins. Please use a diode, as described [[https://github.com/dcwbrown/dwire-debug#ft232rch340-usb-uart-hardware][here]], until
-this is fixed.
-#+end_quote
+Follow the ordinary [[https://github.com/microchip-pic-avr-tools/pymcuprog#serial-port-updi-pyupdi][pymcuprog]] guidance for how to get the serial port
+set up to talk UPDI.
 
 Since the UPDI interface resembles debugWIRE (see below), you can also
-give [[https://github.com/dcwbrown/dwire-debug][dwire-debug]] a read
-for more details and for some UART adapter recommendations.
+give [[https://github.com/dcwbrown/dwire-debug][dwire-debug]] a read for more details and for some UART adapter
+recommendations. It can also help to try with ~avrdude~ first, since
+its ~serialupdi~ programmer uses the same communication mechanisms:
+
+#+begin_src bash
+> avrdude -c serialupdi -P /dev/ttyUSB1 -b 9600 -p t414
+#+end_src
 
 For the devices that have a separate UPDI-pin, this should be all
 that's required to use UPDI. Some devices share the UPDI pin and need
@@ -62,7 +78,7 @@ If you're lucky enough to have a version of ~avr-gcc~ above 12.0 or
 devices are supported out of the box:
 
 #+begin_src bash
-  > avr-gcc -DF_CPU=1000000 -Os -g -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
+  > avr-gcc -DF_CPU=1000000 -Os -g3 -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
 #+end_src
 
 Older ~avr-gcc~ versions can still target the newer UPDI-enabled
@@ -70,23 +86,35 @@ devices, but you'll need to provide appropriate headers and
 libraries. https://start.atmel.com/ may be able to provide you with a
 project template.
 
-Since ~updi-gdbserver~ supports writing to the target flash and
-~avr-gdb~ supports extracting the program section of elf-files,
-"programming" your target can be done with the ~load~ command from
-~avr-gdb~.
+The ~-g~ option ensures that debugging information, like symbol names,
+is available to ~avr-gdb~. The ~-g3~ option also includes preprocessor
+macros, like ~PORTA~, which is handy to have available in your
+~avr-gdb~ session.
+
+Programming your target can be done with the ~load~ command from
+~avr-gdb~. Here, ~avr-gdb~ will extract the program section of the
+elf-file and send that to ~updi-gdbserver~ in a series of
+~vFlashWrite~ commands followed by a final
+~vFlashDone~. ~updi-gdbserver~ holds the flash pages in memory and
+writes the modified pages to the target device after receiving
+~vFlashDone~. When recompiling your elf-files, running ~load~ is
+sufficient to both update the (modified pages of) target flash, and
+update the current ~avr-gdb~ session with any changes.
 
 *** Running ~gdbserver~
 
+Complete the build steps above, then try this, for example:
+
 #+begin_src bash
-  > ./gdbserver -b 10000 /dev/ttyUSB1                                                                        1s
+  > ./gdbserver -b 115200 /dev/ttyUSB1
   Starting gdbserver on port 4444. Press ctrl-c to quit.
   Connect with, for example:
-  avr-gdb -ex "target extended-remote 127.0.0.1:4444" program.elf
+  avr-gdb -ex "target extended-remote 127.0.0.1:4444" example-led-blink.elf
 #+end_src
 
 *** Running ~avr-gdb~
 
-With ~./gdbserver~ running and the stars aligned, you might be able to
+With ~gdbserver~ running and the stars aligned, you might be able to
 do something this:
 
 #+begin_src sh
@@ -108,7 +136,7 @@ do something this:
   # wait a bit and hit C-c
   ^C
   Program received signal SIGINT, Interrupt.
-  0x000000c8 in _delay_ms (__ms=100) at /home/klm/x/avr//avr/include/util/delay.h:187
+  0x000000c8 in _delay_ms (__ms=100) at /home/user/x/avr//avr/include/util/delay.h:187
   187		__builtin_avr_delay_cycles(__ticks_dc);
 
   # updi-gdbserver supports 1 hardware breakpoints, which doesn't require
@@ -126,7 +154,32 @@ do something this:
   # after a brief moment, gdb should reply as the target hits our breakpoint
   Breakpoint 1, main () at example-led-blink.c:7
   7	    PORTA.OUT |=  (1 << PIN6_bp); _delay_ms(100);
+
+  (gdb) p/t PORTA.IN
+  $14 = 11110001
 #+end_src
+
+Note that software breakpoints are often the default for various IDEs
+etc. These may still work but haven't been tested extensively, and
+also wear down the flash. Being explicit about ~hbreak~ instead of
+~break~ is therefore currently recommended.
+
+When the target program is running, ~updi-gdbserver~ has to poll the
+target (currently at 100 Hz) which causes high UART activity.
+
+** Comparison to debugWIRE
+
+debugWIRE is an older protocol for debugging AVR devices. It's on the
+very popular ~attiny85~, for example. It has a lot in common with
+UPDI, particularly in that it's a 1-wire, half-duplex, UART-based
+interface that can be used to debug AVR chips with just a UART
+adapter.
+
+One major advantage of UPDI versus debug-wire is that the UPDI UART
+baud rate is independent of target CPU speed. The target UPDI module
+will detect the host UPDI baudrate using the ~0x55~ mark, and reply
+with the same baudrate. This, for example, makes it possible to change
+the target CPU clockspeed during a debugging session.
 
 ** REPL
 
@@ -159,20 +212,6 @@ The DAC output is shown in purple, and the rather slow UPDI UART
 communication is shown in blue. The delays between the ~dac~ calls are
 caused by UART communication. This could probably be improved by
 investigating at guard time and UPDI clock speed.
-
-** Comparison to debugWIRE
-
-debugWIRE is an older protocol for debugging AVR devices. It's on the
-very popular ~attiny85~, for example. It has a lot in common with
-UPDI, particularly in that it's a 1-wire, half-duplex, UART-based
-interface that can be used to debug AVR chips with just a UART
-adapter.
-
-One major advantage of UPDI versus debug-wire is that the UPDI UART
-baud rate is independent of target CPU speed. The target UPDI module
-will detect the host UPDI baudrate using the ~0x55~ mark, and reply
-with the same baudrate. This, for example, makes it possible to change
-the target CPU clockspeed during a debugging session.
 
 ** TODOs
 
