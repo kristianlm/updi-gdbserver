@@ -183,13 +183,15 @@ the target CPU clockspeed during a debugging session.
 
 ** REPL
 
+#+begin_quote
+⚠ This is highly experimental and subject to change.
+#+end_quote
+
 There is also a Scheme REPL available where you can experiment. I find
 it useful to poke at peripheral registers interactively from a REPL
 environment before I start writing any code meant to run on the
 target. Below is an example of using the DAC peripheral while the
 target CPU is stopped.
-
-This is highly experimental and subject to change.
 
 #+begin_src scheme
   me@workstation> rlwrap nc localhost 1234
