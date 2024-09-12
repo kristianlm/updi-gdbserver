@@ -40,7 +40,7 @@ unusual build steps. Try this:
   > chicken-install -s srfi-18 # install dependencies
   > git clone https://github.com/kristianlm/updi-gdbserver
   > cd updi-gdbserver
-  > csc -O1 gdbserver.scm
+  > csc -O1 gdbserver.scm # or chicken-csc
   > ./gdbserver
   -b <baud>               Set baudrate of UPDI serial port (required)
   -p <gdbserver-port>     Set TCP listening port for GDB-server (defaults to 4444)
@@ -78,7 +78,8 @@ If you're lucky enough to have a version of ~avr-gcc~ above 12.0 or
 devices are supported out of the box:
 
 #+begin_src bash
-  > avr-gcc -DF_CPU=1000000 -Os -g3 -mmcu=attiny414 example-led-blink.c -o example-led-blink.elf
+  > avr-gcc -DF_CPU=1000000 -Os -g3 -mmcu=attiny414 \
+      example-led-blink.c -o example-led-blink.elf
 #+end_src
 
 Older ~avr-gcc~ versions can still target the newer UPDI-enabled
