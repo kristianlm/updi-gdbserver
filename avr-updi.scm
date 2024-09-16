@@ -55,9 +55,38 @@
             (error "unexpected read fd ≠ " (car rs) fd))
         #f)))
 
-(define timeout-procedure
-  (make-parameter
-   (lambda (fd s) (error (conc "updi read timeout (" s "s)")))))
+
+(define (timeout-procedure/give-up fd s)
+  (error (conc "unable to establish link with target:")
+         (conc "updi read timeout (" s "s)")))
+
+;; these are taken from avrdude.
+(define (updi-init-session-parameters)
+  ;;                    ,--- NACKDIS
+  ;;                    |,-- CCDETDIS collision/contention detection
+  ;;                    ||,- UPDIDIS
+  (STCS UPDI.CTRLB #b00001000)
+  ;;                 ,------ IBDLY inter-byte delay
+  ;;                 |
+  ;;                 | ,---- PARD parity disable
+  ;;                 | |,--- DTD Disable Time-Out Detection
+  ;;                 | ||,-- RSD Response Signature Disable
+  ;;                 | |||,,,-- GTVAL[2:0] Guard Time Value (000=128cycles)
+  (STCS UPDI.CTRLA #b10000000))
+
+(define (timeout-procedure/retry fd s attempt)
+  (begin;;parameterize ((timeout-procedure timeout-procedure/give-up))
+    (print "updi-init: no response from programmer, resetting UPDI link (attempt " attempt ")")
+    (updi-break) ;; double-break signal for extra hope
+    (updi-break)
+    (updi-init-session-parameters)
+    (LDCS UPDI.STATUSA)
+    ;; hand off pretent-response to the LDCS call
+    ;; below so it can do its bytes->u8 conversion.
+    "\x00"
+    #f))
+
+;;(define timeout-procedure (make-parameter timeout-procedure/retry))
 
 ;; handle partial reads produced by file-read.
 ;;
@@ -65,14 +94,17 @@
 ;; never occur. they should ideally never occur.
 (define (file-read-retrying fd len)
   (let loop ((len len)
-             (result '())) ;; <-- reversed list of strings
+             (result '()) ;; <-- reversed list of strings
+             (attempt 0))
     (if (> len 0)
         (let* ((reply* (file-read fd len)) ;; <-- can timeout with 0 bytes
                (reply# (cadr reply*))
                (reply  (substring (car  reply*) 0 reply#)))
           (if (= 0 reply#)
-              ((timeout-procedure) fd 1)
-              (loop (- len reply#) (cons reply result))))
+              (cond ((timeout-procedure/retry fd 1 attempt) =>
+                     (lambda (msg) (error msg)))
+                    (else (loop len result (+ attempt 1))))
+              (loop (- len reply#) (cons reply result) 0)))
         (let ((final (reverse-string-append result)))
           (prnt "  read: " (string->blob final))
           final))))
@@ -93,39 +125,11 @@
   (updi-break)
   (updi-drain! 1) ;; TODO: make it work with <1s here, (avrdude uses 250ms)
 
-  (define (timeout-give-up fd s)
-    (error "unable to establish link with target"))
-
-  ;; these are taken from avrdude.
-  (define (updi-init-session-parameters)
-    ;;                    ,--- NACKDIS
-    ;;                    |,-- CCDETDIS collision/contention detection
-    ;;                    ||,- UPDIDIS
-    (STCS UPDI.CTRLB #b00001000)
-    ;;                 ,------ IBDLY inter-byte delay
-    ;;                 |
-    ;;                 | ,---- PARD parity disable
-    ;;                 | |,--- DTD Disable Time-Out Detection
-    ;;                 | ||,-- RSD Response Signature Disable
-    ;;                 | |||,,,-- GTVAL[2:0] Guard Time Value (000=128cycles)
-    (STCS UPDI.CTRLA #b10000000))
-
   (updi-init-session-parameters)
 
-  (parameterize ((timeout-procedure
-                  (lambda (fd s)
-                    (parameterize ((timeout-procedure timeout-give-up))
-                      (prnt "updi-init: no response from programmer, resetting UPDI link")
-                      (updi-break) ;; double-break signal for extra hope
-                      (updi-break)
-                      (updi-init-session-parameters)
-                      (LDCS UPDI.STATUSA)
-                      ;; hand off pretent-response to the LDCS call
-                      ;; below so it can do its bytes->u8 conversion.
-                      "\x00"))))
-    ;; we verify link by reading STATUSA, as avrdude does. an
-    ;; error will timeout and trigger the procedure above.
-    (LDCS UPDI.STATUSA)))
+  ;; we verify link by reading STATUSA, as avrdude does. an
+  ;; error will timeout and trigger the procedure above.
+  (LDCS UPDI.STATUSA))
 
 ;; send `data` and consume its echo (since TX is physically connected
 ;; to RX).
