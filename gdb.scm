@@ -7,8 +7,6 @@
 
 (include "pages.scm")
 
-(define (string-prefix? s prefix) (substring=? s prefix 0 0 (string-length prefix)))
-
 ;; gdb-addressing (flash starting at 0x00)
 (define cache (make-memory-cache #x20000)) ;; <-- TODO actual target size
 
@@ -231,10 +229,10 @@
                op))
 
    ;; get memory region
-   ;;((string-prefix? cmd "m"))
+   ;;((substring=? cmd "m"))
 
    ;; get register value
-   ;;((string-prefix? cmd "p") (error "TODO p (get register)"))
+   ;;((substring=? cmd "p") (error "TODO p (get register)"))
 
    ;; TODO: clean this up (and generalize?)
    ;; store register value, eg "P21=0a00"
@@ -255,7 +253,7 @@
    ;; "OK" => OK, no output
    ;; "xxXXxxXX" hex string => normal output
    ;; "E xx" => error
-   ((and (string? cmd) (string-prefix? cmd "qRcmd,"))
+   ((and (string? cmd) (substring=? cmd "qRcmd,"))
     (apply
      (lambda (_ #!optional (hex ""))
        (rsp-write
@@ -273,7 +271,7 @@
            (rsp-write (string->hex (memory-read* (gdb-adr->updi-adr addr) len)) op))))
 
    ;; TODO: support X for less hex parsing and stuff maybe
-   ;;((and (string? cmd) (string-prefix? cmd "X")))
+   ;;((and (string? cmd) (substring=? cmd "X")))
 
    ;; store to memory (hex)
    ;; eg "M80,8:0000e5cff894ffcf"
